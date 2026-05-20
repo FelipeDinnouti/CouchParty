@@ -11,14 +11,10 @@
             "id": "f44c2cbe996f377f",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Structure/ARCHITECTURE.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "ARCHITECTURE"
+              "title": "Nova aba"
             }
           }
         ]
@@ -182,6 +178,13 @@
   },
   "active": "f44c2cbe996f377f",
   "lastOpenFiles": [
+    "Structure/Terminology.md",
+    "Structure/PlayerManager.md",
+    "Structure/GamePlugin.md",
+    "Structure/GameLifecycle.md",
+    "Structure/BinaryProtocol.md",
+    "Structure/ARCHITECTURE.md",
+    "Structure/Architecture.md",
     "Games/-GameDirection (README).md",
     "Games/CookOff.md",
     "Structure/GAMEPLUGIN.md"

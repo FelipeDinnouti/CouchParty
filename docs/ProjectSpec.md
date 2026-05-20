@@ -4,10 +4,10 @@ The following document is the specification of a clean, scalable architecture fo
 
 Layer Choice Why
 Runtime Node.js (v18+) Fast, JS everywhere, excellent package ecosystem.
-HTTP + Static Express Simple to serve TV/phone pages, assets, and API endpoints.
+HTTP + Static Express Simple to serve globalScreen/phone pages, assets, and API endpoints.
 Real‑time comms Socket.IO (with built‑in binary) Rooms, automatic reconnection, fallback, and binary message support (ArrayBuffer) – perfect for your orientation data.
 State management In‑memory in Node.js (for small group) No DB needed for a local party setup; maximum simplicity.
-Game rendering (TV) Each game can choose: vanilla Canvas, Phaser 3, PixiJS, or just HTML/CSS. The framework shouldn’t force a renderer; games bring their own.
+Game rendering (Global Screen) Each game can choose: vanilla Canvas, Phaser 3, PixiJS, or just HTML/CSS. The framework shouldn’t force a renderer; games bring their own.
 Phone UI Vanilla web (HTML/CSS/JS) Lightweight, no framework overhead, works everywhere.
 
 No build step required – the server serves raw ES modules or plain <script> tags. Games can be as simple as a few .js and .html files.
@@ -21,8 +21,8 @@ party-games/
 ├── server.js                  ← Entry point: sets up Express + Socket.IO
 ├── package.json
 ├── public/                    ← Static root
-│   ├── lobby/                 ← Common lobby TV & controller pages
-│   │   ├── tv.html
+│   ├── lobby/                 ← Common lobby globalScreen & controller pages
+│   │   ├── globalScreen.html
 │   │   └── controller.html
 │   ├── shared/                ← Shared scripts & styles
 │   │   ├── socket.js          ← Socket.IO client helper (connection, common messages)
@@ -31,15 +31,15 @@ party-games/
 │   └── games/
 │       ├── pong/
 │       │   ├── game.js        ← Server‑side game logic
-│       │   ├── tv/            ← TV page assets
+│       │   ├── globalScreen/   ← Global screen page assets
 │       │   │   ├── index.html
-│       │   │   └── pong-tv.js
+│       │   │   └── pong-globalScreen.js
 │       │   └── controller/    ← Phone page assets
 │       │       ├── index.html
 │       │       └── pong-controller.js
 │       ├── trivia/
 │       │   ├── game.js
-│       │   ├── tv/
+│       │   ├── globalScreen/
 │       │   └── controller/
 │       └── …more games…
 └── src/                       ← Core framework
@@ -74,8 +74,8 @@ class GameBase {
   // Called ~60 times per second with delta time (ms)
   onTick(deltaMs) { }
 
-  // Standard way to broadcast full state to TV or to individual phones
-  sendToTV(event, payload) { }
+  // Standard way to broadcast full state to global screen or to individual phones
+  sendToGlobalScreen(event, payload) { }
   sendToPlayer(playerId, event, payload) { }
 
   // Must be called when the game finishes
@@ -83,7 +83,7 @@ class GameBase {
 }
 ```
 
-The framework provides sendToTV / sendToPlayer which automatically target the correct Socket.IO rooms (room: game_{gameId}_tv, player_{playerId}). Games never touch raw sockets directly.
+The framework provides sendToGlobalScreen / sendToPlayer which automatically target the correct Socket.IO rooms (room: game_{gameId}_globalScreen, player_{playerId}). Games never touch raw sockets directly.
 
 Registration: The server’s GameLoader.js reads all game.js files, requires them, and builds a dictionary:
 
@@ -97,10 +97,10 @@ const games = {
 On lobby selection, the server:
 
 1. Instantiates the chosen game's class.
-2. Tells all players to load GET /games/pong/tv/index.html (TV) or /games/pong/controller/index.html (phones).
+2. Tells all players to load GET /games/pong/globalScreen/index.html (global screen) or /games/pong/controller/index.html (phones).
 3. Calls game.onStart({ players }).
 
-The TV and phone pages just contain the UI; they listen for official server events and send inputs like:
+The global screen and phone pages just contain the UI; they listen for official server events and send inputs like:
 
 ```javascript
 socket.emit('game:input', { type: 'button', button: 'A' });
@@ -124,7 +124,7 @@ When a game ends via endGame({ winners, scores }), the framework automatically u
 this.addPoints(playerId, points);   // available inside GameBase
 ```
 
-The lobby TV page shows the global leaderboard. This is all managed in PlayerManager, completely separate from individual game logic.
+The lobby global screen page shows the global leaderboard. This is all managed in PlayerManager, completely separate from individual game logic.
 
 ---
 
@@ -160,26 +160,26 @@ The framework provides a helper to enable/disable on all players with a single c
 
 ---
 
-6. How the Game Plugin and TV/Phone Pages Interact
+6. How the Game Plugin and Global Screen/Phone Pages Interact
 
-The TV page for a game is dumb: it only renders the visual state and maybe handles “start game” from the TV remote. It receives state snapshots from the server (e.g., paddle positions, scores) via Socket.IO room game_{id}_tv. It never sends inputs except maybe a “pause” or “back to lobby”.
+The global screen page for a game is dumb: it only renders the visual state and maybe handles "start game" from a remote or host device. It receives state snapshots from the server (e.g., paddle positions, scores) via Socket.IO room game_{id}_globalScreen. It never sends inputs except maybe a "pause" or "back to lobby".
 
 The phone controller page:
 
-· Shows buttons, joysticks, or a “tilt active” indicator.
+· Shows buttons, joysticks, or a "tilt active" indicator.
 · Sends game:input messages (JSON) for discrete actions.
 · If orientation is enabled, stops sending JSON for motion and switches to binary packets.
 · Receives private feedback (vibrate, flash, sound) over the socket.
 
-The game server logic (Node.js) runs a fixed‑timestep or variable‑timestep loop (using setInterval or requestAnimationFrame on server side via a timer) that calls onTick(delta). Inside onTick, the game updates physics/state, then broadcasts to TV and (optionally) phones.
+The game server logic (Node.js) runs a fixed‑timestep or variable‑timestep loop (using setInterval or requestAnimationFrame on server side via a timer) that calls onTick(delta). Inside onTick, the game updates physics/state, then broadcasts to global screen and (optionally) phones.
 
 ---
 
 7. Lobby Flow & Game Session Lifecycle
 
-1. TV opens http://192.168.1.10:3000/lobby/tv.html → shows a “Join with your phone” screen + a QR code.
+1. Global screen opens http://192.168.1.10:3000/lobby/globalScreen.html → shows a "Join with your phone" screen + a QR code.
 2. Phones open http://192.168.1.10:3000/lobby/controller.html → enter a name, join → appear in lobby.
-3. TV remote / a host phone browses the list of available games (fetched from server). Selects one.
+3. Host device (remote or phone) browses the list of available games (fetched from server). Selects one.
 4. Server:
    · Creates a new game session with all connected players.
    · Moves players from lobby room to game room.
@@ -198,7 +198,7 @@ The framework ensures no game has to implement any of this network choreography.
 · Lobby pages: simple enough that they can be reused for all games.
 · Example game – “Pong”:
   · Server: PongGame extends GameBase, tracks ball/paddles, uses orientation for paddle position.
-  · TV: renders game field, updates from server state.
+  · Global Screen: renders game field, updates from server state.
   · Phone: shows “tilt to move” hint; sends binary orientation.
 · Binary helper: small module that handles encoding/decoding and permission prompts.
 
@@ -209,13 +209,13 @@ The framework ensures no game has to implement any of this network choreography.
 · Wi‑Fi latency: local network is fine; but if you send orientation at 60 Hz, use binary.
 · iOS motion permissions: the orientation.js helper wraps the pop‑up flow gracefully.
 · Reconnection: players get a token stored in localStorage; if they reconnect, they’re placed back into their game session. The base game’s onPlayerReconnect can restore phone UI state.
-· Full‑screen on TV Stick: the TV page can use the Fullscreen API on first touch; on Xiaomi, it may need a user click. Provide a big “Go Fullscreen” button.
+· Full‑screen on TV Stick: the global screen page can use the Fullscreen API on first touch; on Xiaomi, it may need a user click. Provide a big “Go Fullscreen” button.
 
 ---
 
 10. Next Level: Zero‑latency Peer‑to‑Peer?
 
-For games that need immediate feedback (like a driving game where the phone screen shows a wheel and TV shows the road), you could eventually bypass the server for some messages using WebRTC data channels directly between phone and TV, but for a first version, the client‑server model is more than enough and far simpler.
+For games that need immediate feedback (like a driving game where the phone screen shows a wheel and the global screen shows the road), you could eventually bypass the server for some messages using WebRTC data channels directly between phone and TV, but for a first version, the client‑server model is more than enough and far simpler.
 
 ---
 

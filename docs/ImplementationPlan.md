@@ -26,7 +26,7 @@ CouchParty/
 ├── package.json
 ├── public/                     ← Static root
 │   ├── lobby/
-│   │   ├── tv.html
+│   │   ├── globalScreen.html
 │   │   └── controller.html
 │   ├── shared/
 │   │   ├── socket.js
@@ -36,9 +36,9 @@ CouchParty/
 │   └── games/
 │       └── pong/
 │           ├── game.js
-│           ├── tv/
+│           ├── globalScreen/
 │           │   ├── index.html
-│           │   └── pong-tv.js
+│           │   └── pong-globalScreen.js
 │           └── controller/
 │               ├── index.html
 │               └── pong-controller.js
@@ -59,7 +59,7 @@ Base class all games must extend.
 **Features:**
 - Constructor receives `id`, `name`, `description`, `minPlayers`, `maxPlayers`
 - Lifecycle hooks: `onStart`, `onInput`, `onPlayerLeave`, `onTick`
-- Helper methods: `sendToTV`, `sendToPlayer`, `endGame`, `addPoints`
+- Helper methods: `sendToGlobalScreen`, `sendToPlayer`, `endGame`, `addPoints`
 - Orientation toggle: `requireOrientation` flag
 
 **Output:** `src/GameBase.js`
@@ -118,18 +118,18 @@ Auto-discovers and loads game modules.
 |-------|-----------|-------------|
 | `player:join` | Client → Server | Player enters name, joins lobby |
 | `player:reconnect` | Client → Server | Player reconnects with token |
-| `lobby:players` | Server → TV | Broadcasts current player list |
+| `lobby:players` | Server → Global Screen | Broadcasts current player list |
 | `lobby:games` | Server → Client | Sends available games list |
-| `game:start` | TV → Server | Host starts selected game |
+| `game:start` | Global Screen → Server | Host starts selected game |
 | `game:start` | Server → All | Notifies all to navigate to game |
 | `game:input` | Controller → Server | Player sends game input |
 | `game:orientation` | Controller → Server | Binary orientation data |
-| `game:state` | Server → TV | Broadcasts game state |
+| `game:state` | Server → Global Screen | Broadcasts game state |
 | `game:end` | Server → All | Game finished, return to lobby |
 
 ### 3.3 Room Management
 - `lobby` - All connected players in pre-game state
-- `game_{id}_tv` - TV display for a specific game
+- `game_{id}_globalScreen` - Global screen display for a specific game
 - `player_{id}` - Individual player socket room
 
 ### 3.4 Game Lifecycle
@@ -187,7 +187,7 @@ Using [nipplejs](https://github.com/yoannrodrigo/nipplejs) - a lightweight virtu
 
 ## Phase 5: Lobby Pages (`public/lobby/`)
 
-### 5.1 TV Lobby (`tv.html`)
+### 5.1 Global Screen Lobby (`globalScreen.html`)
 **Features:**
 - Display QR code linking to controller page
 - Show current player list (updates in real-time)
@@ -195,7 +195,7 @@ Using [nipplejs](https://github.com/yoannrodrigo/nipplejs) - a lightweight virtu
 - "Start Game" button (enabled when min players reached)
 - Fullscreen toggle
 
-**Output:** `public/lobby/tv.html`
+**Output:** `public/lobby/globalScreen.html`
 
 ### 5.2 Controller Lobby (`controller.html`)
 **Features:**
@@ -226,7 +226,7 @@ Using [nipplejs](https://github.com/yoannrodrigo/nipplejs) - a lightweight virtu
 
 **Output:** `public/games/pong/game.js`
 
-### 6.2 TV Display (`tv/index.html`, `pong-tv.js`)
+### 6.2 Global Screen Display (`globalScreen/index.html`, `pong-globalScreen.js`)
 **Features:**
 - Canvas rendering of game field
 - Two paddles, ball, center line
@@ -235,8 +235,8 @@ Using [nipplejs](https://github.com/yoannrodrigo/nipplejs) - a lightweight virtu
 - Winner announcement overlay
 
 **Output:**
-- `public/games/pong/tv/index.html`
-- `public/games/pong/tv/pong-tv.js`
+- `public/games/pong/globalScreen/index.html`
+- `public/games/pong/globalScreen/pong-globalScreen.js`
 
 ### 6.3 Phone Controller (`controller/index.html`, `pong-controller.js`)
 **Features:**
@@ -259,7 +259,7 @@ Using [nipplejs](https://github.com/yoannrodrigo/nipplejs) - a lightweight virtu
 **Contents:**
 - System overview diagram
 - Component responsibilities
-- Data flow between server, TV, and phones
+- Data flow between server, global screen, and phones
 
 ### 7.2 Game Plugin Contract
 **Output:** `docs/GAME_PLUGIN.md`
