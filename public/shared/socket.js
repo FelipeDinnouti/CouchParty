@@ -1,6 +1,7 @@
 let playerToken = localStorage.getItem('cp_token');
 let playerId = localStorage.getItem('cp_playerId');
 let playerName = localStorage.getItem('cp_playerName');
+let playerColor = localStorage.getItem('cp_playerColor');
 let playerRole = localStorage.getItem('cp_role');
 
 let _socket = null;
@@ -35,24 +36,32 @@ function getSocket() {
     playerToken = token;
     playerId = player.id;
     playerName = player.name;
+    playerColor = player.color;
     localStorage.setItem('cp_token', token);
     localStorage.setItem('cp_playerId', player.id);
     localStorage.setItem('cp_playerName', player.name);
+    localStorage.setItem('cp_playerColor', player.color);
   });
 
   _socket.on('player:reconnected', ({ player }) => {
     playerId = player.id;
     playerName = player.name;
+    playerColor = player.color;
     localStorage.setItem('cp_playerId', player.id);
     localStorage.setItem('cp_playerName', player.name);
+    localStorage.setItem('cp_playerColor', player.color);
   });
 
-  _socket.on('game:start', ({ globalScreenUrl, controllerUrl }) => {
+  _socket.on('game:start', (payload) => {
+    if (payload.players) {
+      localStorage.setItem('cp_gamePlayers', JSON.stringify(payload.players));
+    }
+    window.dispatchEvent(new CustomEvent('game:start', { detail: payload }));
     const role = localStorage.getItem('cp_role');
     if (role === 'controller') {
-      window.location.href = controllerUrl;
+      window.location.href = payload.controllerUrl;
     } else {
-      window.location.href = globalScreenUrl;
+      window.location.href = payload.globalScreenUrl;
     }
   });
 

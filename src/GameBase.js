@@ -1,4 +1,6 @@
 export class GameBase {
+  static PLAYER_COLORS = ['#e94560', '#0f3460', '#4caf50', '#ff9800', '#9c27b0', '#00bcd4'];
+
   constructor(id, name, description, minPlayers, maxPlayers) {
     this.id = id;
     this.name = name;
@@ -10,6 +12,8 @@ export class GameBase {
     this.gameId = null;
     this._ended = false;
     this._loopTimeout = null;
+    this._countdownTimeout = null;
+    this._timerTimeout = null;
     this._onEndGameCallback = null;
     this._onAddPointsCallback = null;
   }
@@ -44,6 +48,40 @@ export class GameBase {
       clearTimeout(this._loopTimeout);
       this._loopTimeout = null;
     }
+  }
+
+  startCountdown(seconds, callback) {
+    let remaining = seconds;
+    const emitCountdown = () => {
+      if (this._ended) return;
+      this.sendToGlobalScreen('game:countdown', { remaining });
+      if (remaining <= 0) {
+        if (callback) callback();
+        return;
+      }
+      remaining--;
+      this._countdownTimeout = setTimeout(emitCountdown, 1000);
+    };
+    emitCountdown();
+  }
+
+  startRoundTimer(seconds, callback) {
+    const endTime = Date.now() + seconds * 1000;
+    const tick = () => {
+      if (this._ended) return;
+      const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+      this.sendToGlobalScreen('game:timer', { remaining });
+      if (remaining <= 0) {
+        if (callback) callback();
+        return;
+      }
+      this._timerTimeout = setTimeout(tick, 1000);
+    };
+    tick();
+  }
+
+  getPlayerColor(index) {
+    return GameBase.PLAYER_COLORS[index % GameBase.PLAYER_COLORS.length];
   }
 
   async onStart({ players, globalScoreboard }) {
@@ -85,6 +123,15 @@ export class GameBase {
     if (this._ended) return;
     this._ended = true;
     this.stopLoop();
+
+    if (this._countdownTimeout) {
+      clearTimeout(this._countdownTimeout);
+      this._countdownTimeout = null;
+    }
+    if (this._timerTimeout) {
+      clearTimeout(this._timerTimeout);
+      this._timerTimeout = null;
+    }
 
     if (this._onEndGameCallback) {
       this._onEndGameCallback(results);

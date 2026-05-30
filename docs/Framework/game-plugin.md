@@ -167,6 +167,51 @@ export default class PongGame extends GameBase {
 
 ---
 
+### Using the Client Engine
+
+Games can import the shared engine modules from `/shared/lib/` for rapid development:
+
+**Global Screen** (`globalScreen/index.html`):
+```html
+<script type="module">
+  import { GameClient } from '/shared/lib/GameClient.js';
+  import { ScoreboardOverlay, CountdownOverlay } from '/shared/lib/UIOverlay.js';
+
+  const client = new GameClient('game-canvas', {
+    virtualWidth: 800,
+    virtualHeight: 600,
+    backgroundColor: '#1a1a2e',
+  });
+
+  const scores = new ScoreboardOverlay({ x: 10, y: 10, width: 300 });
+  const countdown = new CountdownOverlay();
+  client.addOverlay(scores);
+  client.addOverlay(countdown);
+
+  client.setSocket(socket);
+  client.onState = (state) => { client.state = state; };
+  client.onCountdown = (remaining) => countdown.update(remaining);
+  client.render = () => { /* draw game objects from client.state */ };
+  client.start();
+</script>
+```
+
+**Controller** (`controller/index.html`):
+```html
+<script type="module">
+  import { ControllerClient } from '/shared/lib/ControllerClient.js';
+
+  const ctrl = new ControllerClient();
+  ctrl.setSocket(socket);
+  ctrl.createJoystick('joystick-zone');
+  ctrl.createButton('action-btn', 'action-btn');
+</script>
+```
+
+See the module docs in the sidebar for full API details of each engine module.
+
+---
+
 ## Step 3: Create the Global Screen Page
 
 `public/games/mygame/globalScreen/index.html`:
@@ -268,28 +313,36 @@ export default class PongGame extends GameBase {
 
 ## Best Practices
 
+### Client Engine
+- Import `GameClient` for global screen: handles canvas, DPI, resize, game loop
+- Import `ControllerClient` for phone: joystick, buttons, orientation, vibration
+- Import `Physics.js` for collision detection and vector math in both server `game.js` and client pages
+- Import `UIOverlay.js` for scoreboards, timers, countdown, health bars, game-over screens
+- Import `ScreenShake.js` and `ParticleSystem.js` for visual effects
+- Import `AssetLoader.js` and `AudioManager.js` for loading and playing assets
+- Import `CharacterController.js` for platformer/top-down character movement
+- All modules are opt-in — import only what your game needs
+
 ### Game Logic
 - Keep all game logic in `game.js` (server-side)
 - Use `onTick` for physics updates
 - Send complete state each frame (simpler than deltas)
 
 ### Controller
-- Handle touch events with nipplejs or native touch
-- Map joystick Y-axis to desired range
+- Handle touch events via `ControllerClient.createJoystick()` and `createButton()`
+- Map joystick values to your game's coordinate system
 - Use `sendToPlayer` for vibration feedback
 
 ### Global Screen
-- Use HTML5 Canvas for performance
-- Handle window resize
+- Extend `GameClient` or use it directly for canvas setup + game loop
+- Handle window resize (built into `GameClient`)
 - Show winner overlay on game end
+- Use `UIOverlay` components for HUD elements
 
 ### Edge Cases
 - Handle less than minPlayers (end game)
 - Validate all input from controllers
-- Clear intervals/timeouts in `onPlayerLeave`
-
-### Advanced Physics
-Most party games only need simple overlap checks (handled by the built-in `Physics.js`). Games requiring complex rigid-body physics — platform fighters, physics puzzles, stacking — can optionally use [Matter.js](https://github.com/liabru/matter-js). See [physics-engines.md](physics-engines.md) for details on when and how to use it.
+- The framework auto-clears `startLoop`/`startCountdown`/`startRoundTimer` on `endGame`
 
 ---
 
@@ -316,8 +369,8 @@ onOrientation(playerId, alpha, beta, gamma) {
 
 - [ ] Created folder in `public/games/`
 - [ ] Implemented `game.js` extending GameBase
-- [ ] Created globalScreen/index.html
-- [ ] Created controller/index.html
+- [ ] Created globalScreen/index.html (uses `GameClient` or raw canvas)
+- [ ] Created controller/index.html (uses `ControllerClient` or raw input)
 - [ ] Handles all player counts between minPlayers and maxPlayers
 - [ ] Calls `endGame()` when finished
-- [ ] Cleans up intervals on player leave
+- [ ] Imports engine modules from `/shared/lib/` as needed

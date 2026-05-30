@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto';
 
 export class PlayerManager {
+  static PLAYER_COLORS = ['#e94560', '#0f3460', '#4caf50', '#ff9800', '#9c27b0', '#00bcd4'];
+
   constructor() {
     this.players = new Map();
     this.globalScores = new Map();
@@ -20,11 +22,13 @@ export class PlayerManager {
   addPlayer(socket, name) {
     const playerId = this.generatePlayerId();
     const token = this.generateToken();
+    const playerIndex = this.nextPlayerId - 1;
 
     const player = {
       id: playerId,
       token,
       name,
+      color: PlayerManager.PLAYER_COLORS[playerIndex % PlayerManager.PLAYER_COLORS.length],
       socketId: socket.id,
       joinedAt: Date.now(),
       inGame: false,

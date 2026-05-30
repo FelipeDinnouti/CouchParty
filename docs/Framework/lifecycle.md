@@ -47,6 +47,44 @@ Stops the game loop manually (called automatically by `endGame`).
 this.stopLoop(); // Usually not needed — endGame() handles this
 ```
 
+### startCountdown(seconds, callback)
+
+Emits `game:countdown` to the global screen each second (for "3-2-1-GO!" overlay). Calls `callback` when countdown reaches 0.
+
+```javascript
+this.startCountdown(3, () => {
+  this.startLoop(60);
+});
+```
+
+The global screen receives `game:countdown` with `{ remaining }` payload each second.
+
+### startRoundTimer(seconds, callback)
+
+Emits `game:timer` to the global screen each second for round-based play. Calls `callback` when time expires.
+
+```javascript
+this.startRoundTimer(90, () => {
+  this.endGame({ winners: this.getLeader(), scores: this.scores });
+});
+```
+
+The global screen receives `game:timer` with `{ remaining }` payload each second.
+
+### getPlayerColor(index)
+
+Returns a hex color string from the static `PLAYER_COLORS` palette by player index.
+
+```javascript
+const color = this.getPlayerColor(0); // '#e94560'
+```
+
+### Static Constants
+
+```javascript
+static PLAYER_COLORS = ['#e94560', '#0f3460', '#4caf50', '#ff9800', '#9c27b0', '#00bcd4'];
+```
+
 ---
 
 ## Lifecycle Hooks
@@ -227,6 +265,10 @@ this.disableOrientation();
 | `this.io` | Socket.IO | Reference to Socket.IO instance (set by framework) |
 | `this.gameId` | string | Current game session ID (set by framework) |
 | `this.requireOrientation` | boolean | Set to true if game needs motion controls |
+| `this._ended` | boolean | True after `endGame()` has been called (prevents double-end) |
+| `this._loopTimeout` | number | Internal timer handle for the game loop |
+| `this._onEndGameCallback` | function | Set by framework to handle game end (replaces function wrapping) |
+| `this._onAddPointsCallback` | function | Set by framework to handle point addition |
 
 ---
 

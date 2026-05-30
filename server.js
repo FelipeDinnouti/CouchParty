@@ -172,16 +172,18 @@ io.on('connection', (socket) => {
 
     socket.join(`game_${currentGameId}_globalScreen`);
 
-    io.to(`game_${currentGameId}`).emit('game:start', {
+    const gameStartPayload = {
       gameId,
       globalScreenUrl: `/games/${gameId}/globalScreen/`,
       controllerUrl: `/games/${gameId}/controller/`,
-    });
-    io.to(`game_${currentGameId}_globalScreen`).emit('game:start', {
-      gameId,
-      globalScreenUrl: `/games/${gameId}/globalScreen/`,
-      controllerUrl: `/games/${gameId}/controller/`,
-    });
+      players: lobbyPlayers.map(p => ({
+        id: p.id,
+        name: p.name,
+        color: p.color,
+      })),
+    };
+    io.to(`game_${currentGameId}`).emit('game:start', gameStartPayload);
+    io.to(`game_${currentGameId}_globalScreen`).emit('game:start', gameStartPayload);
 
     try {
       await game.onStart({ players: lobbyPlayers, globalScoreboard: playerManager.getGlobalScores() });

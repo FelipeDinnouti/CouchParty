@@ -223,7 +223,7 @@ Using [nipplejs](https://github.com/yoannrodrigo/nipplejs) - a lightweight virtu
 
 ### Background
 
-Every game currently rewrites the same boilerplate from scratch: canvas setup, game loop, input handling, score display, countdown, game-over screens, collision detection, and more. Phase 8 introduces a shared **client-side game engine** — a set of opt-in base classes and utility modules — plus server-side enhancements to `GameBase`. The goal is to eliminate repetitive code while keeping the "no build step, no framework overhead" philosophy: modules are imported only when needed.
+Every game currently rewrites the same boilerplate from scratch: canvas setup, game loop, input handling, score display, countdown, game-over screens, collision detection, and more. Phase 6 introduces a shared **client-side game engine** — a set of opt-in base classes and utility modules — plus server-side enhancements to `GameBase`. The goal is to eliminate repetitive code while keeping the "no build step, no framework overhead" philosophy: modules are imported only when needed.
 
 **Design Principles:**
 - **Opt-in, not mandatory** — games can use the engine or build their own
@@ -654,84 +654,126 @@ character.stun(500); // Stun for 500ms
 
 | Order | Module | Notes |
 |-------|--------|-------|
-| 8.1 | `GameBase` enhancements | `startLoop`, `stopLoop`, `startCountdown`, `startTimer`, `getPlayerColor` |
-| 8.2 | `Colors.js` | Simple data + helpers, no dependencies |
-| 8.3 | `Physics.js` | Pure functions, no dependencies |
-| 8.4 | `AssetLoader.js` | Independent module |
-| 8.5 | `AudioManager.js` | Depends on `AssetLoader` for preloading |
-| 8.6 | `GameClient.js` | Core base class, depends on `Colors.js` (for player color display) |
-| 8.7 | `UIOverlay.js` | Depends on `GameClient.js` (uses its canvas context) |
-| 8.8 | `ScreenShake.js` | Independent, used within `GameClient.render()` |
-| 8.9 | `ParticleSystem.js` | Independent, used within `GameClient.render()` |
-| 8.10 | `ControllerClient.js` | Core base class, no module dependencies |
-| 8.11 | `CharacterController.js` | Depends on `Physics.js` |
-| 8.12 | `server.js` update | Pass `player.color` on join |
-| 8.13 | Update `game-plugin.md` | Document new engine workflow |
-| 8.14 | Update `lifecycle.md` | Document new `GameBase` methods |
+| 6.1 | `GameBase` enhancements | `startLoop`, `stopLoop`, `startCountdown`, `startTimer`, `getPlayerColor` |
+| 6.2 | `Colors.js` | Simple data + helpers, no dependencies |
+| 6.3 | `Physics.js` | Pure functions, no dependencies |
+| 6.4 | `AssetLoader.js` | Independent module |
+| 6.5 | `AudioManager.js` | Sound playback, autoplay handling |
+| 6.6 | `GameClient.js` | Core base class for global screen clients |
+| 6.7 | `UIOverlay.js` | HUD components (scoreboard, timer, etc.) |
+| 6.8 | `ScreenShake.js` | Independent, used within `GameClient.render()` |
+| 6.9 | `ParticleSystem.js` | Independent, used within `GameClient.render()` |
+| 6.10 | `ControllerClient.js` | Core base class for phone controllers |
+| 6.11 | `CharacterController.js` | Depends on `Physics.js` |
+| 6.12 | `server.js` update | Pass `player.color` on join |
+| 6.13 | Update `game-plugin.md` | Document new engine workflow |
+| 6.14 | Update `lifecycle.md` | Document new `GameBase` methods |
 
 ---
 
 ## Phase 7: Framework Test Harness (`public/games/test-harness/`)
 
-A dev-tool game that validates every framework feature — not a real game, but a living test suite.
+A developer dashboard game for visually monitoring, exercising, and validating every framework and engine feature during development. Built after Phase 6 is complete.
 
 ### Design Goals
 
-- **Self-validating** — each test has a clear pass/fail condition displayed on the global screen
-- **Feature coverage** — exercises every lifecycle hook, communication method, and server integration
-- **Debug-friendly** — shows packet contents, timestamps, and round-trip times
-- **Multi-player** — works with 1-4 players, tests onPlayerLeave with partial disconnects
+- **Live monitoring** — Show joystick position, orientation angles, and input counters for every connected controller on the global screen in real-time
+- **Round-trip validation** — Press GS buttons to trigger framework features (sendToPlayer, broadcast, orientation streaming, countdowns) and observe the visual result: messages appearing on controllers, angles updating, overlays rendering
+- **Engine feature exercise** — Press GS buttons to instantiate Phase 6 modules (Physics, Particles, ScreenShake, Audio, Character, AssetLoader, UIOverlay) and see their output rendered in a dedicated canvas area
+- **Developer judgement** — The developer watches and confirms correctness, rather than reading automated pass/fail assertions
+- **Multi-player** — works with 1-4 players
 
 ### 7.1 Server Logic (`game.js`)
 
-```javascript
-export default class TestHarnessGame extends GameBase {
-  constructor() {
-    super('test-harness', 'Framework Test Harness',
-      'Validates all framework features', 1, 4);
-  }
-}
-```
+Extends GameBase like any game. Key responsibilities:
 
-**Tests it runs:**
+- **Input tracking**: Maintains `playerInputs` map with live counters (joystick moves, taps, button presses) per player
+- **Orientation forwarding**: Receives binary orientation packets via `onOrientation`, streams α/β/γ values to GS in real-time
+- **Test action dispatcher**: `onInput` routes `{ type: 'test', action: '...' }` messages from GS buttons to the appropriate GameBase method:
 
-| Test | What it validates |
-|------|-------------------|
-| `onStart` | Players array is correct, properties exist |
-| `onTick` | Loop runs at ~60 FPS, deltaMs is valid and non-zero |
-| `onInput` | Each input type reaches onInput with correct playerId |
-| `sendToPlayer` | Private message reaches the correct controller |
-| `sendToGlobalScreen` | Message reaches global screen only (not controllers) |
-| `broadcastToAll` | Message reaches both controllers and global screen |
-| `addPoints` | Points persist to global scoreboard |
-| `endGame` | Game ends, all players return to lobby, scores updated |
-| `onPlayerLeave` | Hook fires with correct playerId, game continues or ends |
-| `onOrientation` | Float values arrive with correct playerId |
-| `endGame is idempotent` | Calling endGame twice does not double-emit |
+| Action | What the server does |
+|--------|---------------------|
+| `sendToPlayer` | `sendToPlayer(targetId, 'test:feedback', { msg })` |
+| `sendToGS` | `sendToGlobalScreen('test:gsMessage', { msg })` |
+| `broadcast` | `broadcastToAll('test:broadcast', { msg })` |
+| `enableOrientation` | `enableOrientation()` |
+| `disableOrientation` | `disableOrientation()` |
+| `countdown` | `startCountdown(3)` |
+| `timer` | `startRoundTimer(30)` |
 
-### 7.2 Global Screen (`globalScreen/index.html`)
+Minimal server logic — mostly pass-through. Engine feature tests run entirely client-side in the GS page.
 
-**Features:**
-- Real-time test log showing each test as it runs
-- Pass/fail indicators for each test (green check / red X)
-- Heartbeat indicator showing game loop is alive
-- FPS counter
-- "Run All" button and individual test buttons
-- Final results summary with total passed/failed
+### 7.2 Global Screen Dashboard (`globalScreen/index.html`)
 
-### 7.3 Controller (`controller/index.html`)
+Four distinct UI sections:
 
-**Features:**
-- Test buttons corresponding to each test in the suite
-- Orientation display (alpha/beta/gamma) when orientation test runs
-- Private message display (shows `test:feedback` from server)
-- Broadcast display (shows `test:broadcast` from server)
-- Connection status indicator
+**Player Monitor (always visible)**
+A card per connected player showing:
+- Name and connection dot
+- Live joystick x/y (updated via `test:joystick`)
+- Live orientation α/β/γ (updated via `test:orientation`)
+- Input counters: tap count, joystick move count, button press count per button (updated via `test:inputCounts`)
 
-**Output:**
-- `public/games/test-harness/game.js`
-- `public/games/test-harness/globalScreen/index.html`
-- `public/games/test-harness/controller/index.html`
+**Communication Tests (button grid)**
+One button per framework feature:
+- Send to Player 1 / Send to Player 2 — targets specific players
+- Send to Global Screen — tests room isolation
+- Broadcast — tests multi-room delivery
+- Orientation On / Orientation Off — toggles binary streaming
+- Countdown 3s / Round Timer 30s — tests countdown and timer overlays
+
+**Engine Feature Tests (button grid)**
+One button per Phase 6 module, rendered in a canvas area:
+- Physics — runs collision demos (aabb, circle, circleRect)
+- Particles — spawns burst/fountain/confetti presets
+- Screen Shake — triggers shake at configurable intensity
+- Audio — plays test sounds (requires user gesture)
+- Character — spawns a character controllable via joystick
+- Asset Loader — loads a test asset with progress display
+- UIOverlay — cycles through Scoreboard/Timer/HealthBar/GameOver demos
+
+**Engine Test Output (canvas)**
+A `<canvas>` element that appears when an engine test is active. Draws the engine module's output. Clears when dismissed.
+
+**Live Event Log (scrolling)**
+Timestamped feed of all test events. DOM-based, auto-scrolls.
+
+### 7.3 Controller Page (`controller/index.html`)
+
+Four functional areas:
+
+- **Joystick Zone** — Full-screen nipplejs joystick with live x/y readout. Emits `game:input { type: 'joystick', x, y }`.
+- **Input Buttons** — Tap zone (emits `{ type: 'tap', x, y }`), A and B buttons (emit `{ type: 'button', button: 'A'|'B' }`).
+- **Orientation Display** — Shows α/β/γ values when streaming is enabled. Uses `orientation.js` for iOS permission flow and binary encoding.
+- **Message Inbox** — Displays `test:feedback` (noted "Private") and `test:broadcast` (noted "Broadcast") messages from server. Each appears as a styled toast with auto-dismiss.
+
+### 7.4 Event Protocol
+
+| Event | Direction | Payload | Purpose |
+|-------|-----------|---------|---------|
+| `test:joystick` | Server → GS | `{ playerId, x, y }` | Live joystick position |
+| `test:orientation` | Server → GS | `{ playerId, alpha, beta, gamma }` | Live orientation angles |
+| `test:inputCounts` | Server → GS | `{ playerId: { taps, joystickMoves, buttons } }` | Input statistics |
+| `test:feedback` | Server → Controller | `{ msg }` | Private message test |
+| `test:gsMessage` | Server → GS | `{ msg }` | GS-only message test |
+| `test:broadcast` | Server → All | `{ msg }` | Broadcast message test |
+| `test:log` | Server → GS | `{ timestamp, msg }` | Event log entry |
+| `game:input` | GS → Server | `{ type: 'test', action, ... }` | Test action commands |
+
+### 7.5 Implementation (after Phase 6 is complete)
+
+| Step | File | What to build |
+|------|------|---------------|
+| 1 | `game.js` | Game class with input tracking, orientation forwarding, test action dispatch |
+| 2 | `controller/index.html` | Joystick (nipplejs), tap zone, A/B buttons, orientation display, message inbox |
+| 3 | `globalScreen/index.html` | Player monitor, comm test buttons, engine test buttons, canvas area, event log |
+| 4 | — | Wire each engine test to import and run its corresponding Phase 6 module |
+
+### 7.6 Relationship to Integration Tests
+
+- `test/lobby.js` = **automated** regression suite (Node.js, no browser)
+- **Test Harness** = **manual** visual validation tool (browser-based)
+- Both are needed: automation catches regressions, the harness lets developers explore and debug round-trip communication and engine rendering
 
 ---
 
@@ -783,7 +825,7 @@ export default class TestHarnessGame extends GameBase {
 | 4 | Shared client scripts | Required |
 | 5 | Lobby pages | Required |
 | 6 | Game engine layer | Required (before games) |
-| 7 | Framework Test Harness | Required (validates framework) |
+| 7 | Framework Test Harness | Required (dev dashboard + visual validation) |
 | 8 | Documentation | Ongoing |
 
 ---

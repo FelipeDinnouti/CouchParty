@@ -39,20 +39,22 @@
 - ✅ `controller.html` — Name input, join flow, leave button, error toast, reconnection support
 
 ## Phase 6: Game Engine Layer (`public/shared/lib/` + `GameBase`)
-- ✅ `GameBase` — `startLoop(fps)`, `stopLoop()` built in, `_onEndGameCallback`/`_onAddPointsCallback` hooks
-- ❌ `Colors.js` — Player color palette + helpers
-- ❌ `Physics.js` — Collision detection, vector math
-- ❌ `AssetLoader.js` — Image/audio preloading
-- ❌ `AudioManager.js` — Sound playback
-- ❌ `GameClient.js` — Global screen base class (canvas, resize, socket wiring)
-- ❌ `ControllerClient.js` — Phone controller base class (input helpers, orientation)
-- ❌ `UIOverlay.js` — HUD components (scoreboard, timer, health bars, etc.)
-- ❌ `ScreenShake.js` — Camera shake effect
-- ❌ `ParticleSystem.js` — Particle effects
-- ❌ `CharacterController.js` — Character movement + state machine
-- ❌ `server.js` update — Pass `player.color` on join
-- ❌ Update `game-plugin.md` — Document engine workflow
-- ❌ Update `lifecycle.md` — Document new GameBase methods
+- ✅ `GameBase` — `startLoop(fps)`, `stopLoop()`, `startCountdown()`, `startRoundTimer()`, `getPlayerColor()`, `static PLAYER_COLORS`
+- ✅ `Colors.js` — Player color palette, hexToRgba, getPlayerColor
+- ✅ `Physics.js` — Collision detection (aabb, circle, circleRect, pointInRect, overlap), vector math (distance, angle, normalize, clamp, lerp, mapRange)
+- ✅ `AssetLoader.js` — Image/audio preloading with progress callback, error handling
+- ✅ `AudioManager.js` — Sound playback, mute/unmute, global volume, AudioContext unlock
+- ✅ `GameClient.js` — DPI-aware canvas, aspect-ratio preserving resize, rAF loop, socket wiring (game:state, game:end, game:countdown, game:timer)
+- ✅ `ControllerClient.js` — Joystick (nipplejs), buttons (touch+fallback), orientation (iOS permission), vibration, binary packet sending
+- ✅ `UIOverlay.js` — ScoreboardOverlay, TimerOverlay, HealthBarOverlay, ProgressBarOverlay, CountdownOverlay, GameOverOverlay
+- ✅ `ScreenShake.js` — Camera shake with decay, overlapping shake support
+- ✅ `ParticleSystem.js` — Burst/trail/fountain/confetti presets, gravity, fade, drag
+- ✅ `CharacterController.js` — Platformer + top-down modes, states (idle/running/jumping/falling/stunned), knockback, variable-height jump
+- ✅ `PlayerManager` — `color` property on player objects, `static PLAYER_COLORS`
+- ✅ `server.js` — `game:start` payload now includes `players` array with `{ id, name, color }`
+- ✅ `socket.js` — Stores `cp_playerColor` in localStorage, dispatches `game:start` CustomEvent with full payload
+- ✅ `game-plugin.md` — Added client engine section, updated best practices for engine modules
+- ✅ `lifecycle.md` — Documented startCountdown, startRoundTimer, getPlayerColor, PLAYER_COLORS, new properties
 
 ## Phase 7: Framework Test Harness (`public/games/test-harness/`)
 A dev-tool game that validates every framework feature — not a real game, but a living test suite.
@@ -87,8 +89,8 @@ A dev-tool game that validates every framework feature — not a real game, but 
 - ✅ AGENTS.md, currently.md
 - ✅ Root README.md with full project overview, architecture, developer guide, and status
 - ✅ Integration testing guide (`docs/Development/testing.md`) + reusable test script (`test/lobby.js`)
-- ❌ Update `game-plugin.md` — Document engine workflow
-- ❌ Update `lifecycle.md` — Document new GameBase methods
+- ✅ `game-plugin.md` — Documented engine workflow and module usage
+- ✅ `lifecycle.md` — Documented new GameBase methods
 
 ---
 
@@ -113,7 +115,7 @@ A dev-tool game that validates every framework feature — not a real game, but 
 
 ## Immediate Next Steps
 
-1. **Build client engine modules** — `GameClient.js`, `ControllerClient.js`, `Physics.js`, `UIOverlay.js`
-2. **Build Framework Test Harness** — `public/games/test-harness/` with game.js, globalScreen, controller pages
-3. **Build orientation.js** — Client-side motion permissions + binary streaming
-4. **Update documentation** — game-plugin.md, lifecycle.md with engine workflow
+1. **Build Framework Test Harness** — `public/games/test-harness/` with game.js, globalScreen, controller pages
+2. **Build orientation.js** — Client-side motion permissions + binary streaming (or integrate into `ControllerClient.js`)
+3. **Run integration tests** — Verify nothing broke: `node test/lobby.js`
+4. **Manual test** — Start server, open screens, verify lobby + game flow
