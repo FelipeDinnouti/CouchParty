@@ -47,8 +47,8 @@ export default class MyGame extends GameBase {
     this.scores = {};
     players.forEach(p => this.scores[p.id] = 0);
 
-    // Start game loop
-    this.startGameLoop();
+    // Start game loop (automatically calls onTick, stopped by endGame)
+    this.startLoop(60);
   }
 
   onInput(playerId, data) {
@@ -64,16 +64,6 @@ export default class MyGame extends GameBase {
   onPlayerLeave(playerId) {
     // Handle disconnect
     return true; // Continue game
-  }
-
-  startGameLoop() {
-    let lastTime = Date.now();
-    this.interval = setInterval(() => {
-      const now = Date.now();
-      const delta = now - lastTime;
-      lastTime = now;
-      this.onTick(delta);
-    }, 1000 / 60);
   }
 }
 ```
@@ -106,18 +96,8 @@ export default class PongGame extends GameBase {
     // Serve ball
     this.resetBall();
 
-    // Start loop
-    this.startLoop();
-  }
-
-  startLoop() {
-    let lastTime = Date.now();
-    this.interval = setInterval(() => {
-      const now = Date.now();
-      const delta = now - lastTime;
-      lastTime = now;
-      this.onTick(delta);
-    }, 1000 / 60);
+    // Start loop (automatically stopped by endGame)
+    this.startLoop(60);
   }
 
   onInput(playerId, data) {
@@ -154,7 +134,6 @@ export default class PongGame extends GameBase {
 
       if (this.scores[scoredId] >= this.winningScore) {
         this.endGame({ winners: [scoredId], scores: this.scores });
-        clearInterval(this.interval);
       } else {
         this.resetBall();
       }
@@ -180,7 +159,6 @@ export default class PongGame extends GameBase {
   }
 
   onPlayerLeave(playerId) {
-    clearInterval(this.interval);
     this.endGame({ winners: [], scores: this.scores });
     return false;
   }
@@ -309,6 +287,9 @@ export default class PongGame extends GameBase {
 - Handle less than minPlayers (end game)
 - Validate all input from controllers
 - Clear intervals/timeouts in `onPlayerLeave`
+
+### Advanced Physics
+Most party games only need simple overlap checks (handled by the built-in `Physics.js`). Games requiring complex rigid-body physics — platform fighters, physics puzzles, stacking — can optionally use [Matter.js](https://github.com/liabru/matter-js). See [physics-engines.md](physics-engines.md) for details on when and how to use it.
 
 ---
 

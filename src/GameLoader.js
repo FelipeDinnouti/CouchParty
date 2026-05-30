@@ -1,10 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { GameBase } from './GameBase.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export class GameLoader {
   constructor(gamesPath) {
@@ -46,9 +42,13 @@ export class GameLoader {
           console.warn(`${entry.name} does not extend GameBase`);
           continue;
         }
+        if (!instance.id || !instance.name) {
+          console.warn(`${entry.name} is missing required GameBase fields (id, name)`);
+          continue;
+        }
 
-        this.games.set(entry.name, {
-          instance,
+        this.games.set(instance.id, {
+          GameClass,
           meta: {
             id: instance.id,
             name: instance.name,
@@ -70,13 +70,12 @@ export class GameLoader {
   }
 
   getGame(gameId) {
-    const game = this.games.get(gameId);
-    if (!game) {
+    const entry = this.games.get(gameId);
+    if (!entry) {
       return null;
     }
 
-    const newInstance = new game.instance.constructor();
-    return newInstance;
+    return new entry.GameClass();
   }
 
   hasGame(gameId) {

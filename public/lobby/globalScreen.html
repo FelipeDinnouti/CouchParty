@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CouchParty</title>
+  <link rel="stylesheet" href="/shared/styles.css">
+  <style>
+    .error-toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #e94560;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    .error-toast.show { opacity: 1; }
+    .results-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .results-overlay.show { opacity: 1; }
+    .results-overlay h2 { color: #e94560; font-size: 2rem; margin-bottom: 16px; }
+    .results-overlay .result-row {
+      font-size: 1.2rem;
+      padding: 8px 16px;
+      margin: 4px 0;
+      background: #16213e;
+      border-radius: 8px;
+      min-width: 250px;
+      text-align: center;
+    }
+    .results-overlay .result-row:first-of-type {
+      background: #0f3460;
+      border: 2px solid #e94560;
+    }
+  </style>
+</head>
+<body>
+  <button class="btn-fullscreen" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+
+  <div class="container">
+    <h1>CouchParty</h1>
+    <p style="color: #aaa; margin-bottom: 20px;">Scan to join with your phone</p>
+
+    <div class="card">
+      <div class="qr-container"><img id="qr-img" alt="QR Code" style="width: 200px; height: 200px; display: block;"></div>
+      <p style="color: #888; font-size: 0.85rem; margin-top: 8px;">
+        Open <strong id="join-url" style="color: #ddd;"></strong> on your phone
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Players (<span id="player-count">0</span>)</h2>
+      <div class="player-list" id="player-list">
+        <em style="color: #666;">Waiting for players...</em>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Games</h2>
+      <div id="games-list">
+        <em style="color: #666;">Loading games...</em>
+      </div>
+      <button class="btn btn-start" id="btn-start" disabled onclick="startGame()">
+        Start Game
+      </button>
+    </div>
+  </div>
+
+  <div id="error-toast" class="error-toast"></div>
+
+  <div id="results-overlay" class="results-overlay">
+    <h2>Game Over</h2>
+    <div id="results-list"></div>
+    <p style="color: #888; margin-top: 20px; font-size: 0.85rem;">Returning to lobby...</p>
+  </div>
+
+  <script src="/shared/socket.io.min.js"></script>
+  <script src="/shared/socket.js"></script>
+  <script>
+    let selectedGame = null;
+    let selectedGameMeta = null;
+    let gamesData = [];
+    let playerCount = 0;
+    const socket = getSocket();
+
+    localStorage.setItem('cp_role', 'globalScreen');
+
+    function showError(message) {
+      const toast = document.getElementById('error-toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 4000);
+    }
+
+    function toggleFullscreen() {
+      try {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+        } else {
+          document.exitFullscreen();
+        }
+      } catch (e) {
+        showError('Fullscreen is not supported');
+      }
+    }
+
+    socket.on('connect', () => {
+      socket.emit('lobby:requestState');
+    });
+
+    socket.on('error', ({ message }) => {
+      showError(message);
+    });
+
+    socket.on('lobby:games', (games) => {
+      gamesData = games;
+      const container = document.getElementById('games-list');
+      if (!games || games.length === 0) {
+        container.innerHTML = '<em style="color: #666;">No games available</em>';
+        return;
+      }
+      container.innerHTML = games.map(g => `
+        <div class="game-card" onclick="selectGame('${g.id}')" data-id="${g.id}">
+          <div class="info">
+            <h3>${g.name}</h3>
+            <p>${g.description} — ${g.minPlayers}-${g.maxPlayers} players</p>
+          </div>
+          <div class="status-dot ${selectedGame === g.id ? 'online' : 'offline'}"></div>
+        </div>
+      `).join('');
+      updateStartButton();
+    });
+
+    socket.on('lobby:players', (players) => {
+      const list = document.getElementById('player-list');
+      const count = document.getElementById('player-count');
+      playerCount = players.length;
+      count.textContent = playerCount;
+      if (!players || players.length === 0) {
+        list.innerHTML = '<em style="color: #666;">Waiting for players...</em>';
+        return;
+      }
+      const colors = ['#e94560', '#0f3460', '#4caf50', '#ff9800', '#9c27b0', '#00bcd4'];
+      list.innerHTML = players.map((p, i) => `
+        <div class="player-card">
+          <span class="color" style="background: ${colors[i % colors.length]}"></span>
+          ${p.name}
+        </div>
+      `).join('');
+      updateStartButton();
+    });
+
+    function selectGame(gameId) {
+      if (selectedGame === gameId) {
+        selectedGame = null;
+        selectedGameMeta = null;
+      } else {
+        selectedGame = gameId;
+        selectedGameMeta = gamesData.find(g => g.id === gameId);
+      }
+      document.querySelectorAll('.game-card').forEach(el => {
+        const dot = el.querySelector('.status-dot');
+        dot.className = 'status-dot ' + (el.dataset.id === selectedGame ? 'online' : 'offline');
+      });
+      updateStartButton();
+    }
+
+    function updateStartButton() {
+      const btn = document.getElementById('btn-start');
+
+      if (selectedGameMeta) {
+        const min = selectedGameMeta.minPlayers;
+        btn.disabled = playerCount < min;
+        btn.textContent = playerCount < min
+          ? `Need ${min} players to start (${playerCount} joined)`
+          : `Start ${selectedGameMeta.name}`;
+      } else {
+        btn.disabled = true;
+        btn.textContent = 'Select a game above';
+      }
+    }
+
+    function startGame() {
+      if (!selectedGame) return;
+      socket.emit('game:start', { gameId: selectedGame });
+    }
+
+    socket.on('game:end', (results) => {
+      const overlay = document.getElementById('results-overlay');
+      const list = document.getElementById('results-list');
+      if (results && results.scores) {
+        const entries = Object.entries(results.scores).sort((a, b) => b[1] - a[1]);
+        list.innerHTML = entries.map(([pid, score], i) => {
+          const name = (results.names && results.names[pid]) || pid;
+          const prefix = i === 0 ? '🥇 ' : i === 1 ? '🥈 ' : i === 2 ? '🥉 ' : '';
+          return `<div class="result-row">${prefix}${name}: ${score}</div>`;
+        }).join('');
+      } else {
+        list.innerHTML = '<div class="result-row">No scores</div>';
+      }
+      overlay.classList.add('show');
+    });
+
+    const joinUrl = window.location.origin + '/lobby/controller.html';
+    document.getElementById('join-url').textContent = joinUrl;
+    document.getElementById('qr-img').src = '/qrcode?text=' + encodeURIComponent(joinUrl);
+  </script>
+</body>
+</html>

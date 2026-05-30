@@ -1,8 +1,11 @@
+import { randomUUID } from 'crypto';
+
 export class PlayerManager {
   constructor() {
     this.players = new Map();
     this.globalScores = new Map();
     this.reconnectionTokens = new Map();
+    this.socketIdToPlayer = new Map();
     this.nextPlayerId = 1;
   }
 
@@ -11,7 +14,7 @@ export class PlayerManager {
   }
 
   generateToken() {
-    return `token_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    return `token_${randomUUID()}`;
   }
 
   addPlayer(socket, name) {
@@ -26,16 +29,31 @@ export class PlayerManager {
       joinedAt: Date.now(),
       inGame: false,
       gameId: null,
+      connected: true,
     };
 
     this.players.set(playerId, player);
     this.globalScores.set(playerId, { score: 0, name });
     this.reconnectionTokens.set(token, playerId);
+    this.socketIdToPlayer.set(socket.id, playerId);
 
     socket.playerId = playerId;
     socket.join('lobby');
 
     return { player, token };
+  }
+
+  disconnectPlayer(socketId) {
+    const playerId = this.socketIdToPlayer.get(socketId);
+    if (!playerId) return null;
+
+    this.socketIdToPlayer.delete(socketId);
+
+    const player = this.players.get(playerId);
+    if (player) {
+      player.connected = false;
+    }
+    return player || null;
   }
 
   reconnectPlayer(socket, token) {
@@ -46,11 +64,17 @@ export class PlayerManager {
 
     const player = this.players.get(playerId);
     if (!player) {
+      this.reconnectionTokens.delete(token);
       return null;
     }
 
+    this.socketIdToPlayer.delete(player.socketId);
+
     player.socketId = socket.id;
+    player.connected = true;
     socket.playerId = playerId;
+
+    this.socketIdToPlayer.set(socket.id, playerId);
 
     if (player.inGame && player.gameId) {
       socket.join(`game_${player.gameId}`);
@@ -63,11 +87,15 @@ export class PlayerManager {
 
   removePlayer(playerId) {
     const player = this.players.get(playerId);
-    if (player) {
-      this.players.delete(playerId);
-      if (player.token) {
-        this.reconnectionTokens.delete(player.token);
-      }
+    if (!player) return;
+
+    this.players.delete(playerId);
+    this.globalScores.delete(playerId);
+    if (player.token) {
+      this.reconnectionTokens.delete(player.token);
+    }
+    if (player.socketId) {
+      this.socketIdToPlayer.delete(player.socketId);
     }
   }
 
@@ -80,7 +108,7 @@ export class PlayerManager {
   }
 
   getLobbyPlayers() {
-    return this.getAllPlayers().filter(p => !p.inGame);
+    return this.getAllPlayers().filter(p => !p.inGame && p.connected);
   }
 
   getGamePlayers(gameId) {
@@ -99,8 +127,6 @@ export class PlayerManager {
     const scoreData = this.globalScores.get(playerId);
     if (scoreData) {
       scoreData.score += points;
-    } else {
-      this.globalScores.set(playerId, { score: points, name: 'Unknown' });
     }
   }
 
@@ -110,23 +136,9 @@ export class PlayerManager {
       .sort((a, b) => b.score - a.score);
   }
 
-  updatePlayerName(playerId, name) {
-    const player = this.players.get(playerId);
-    if (player) {
-      player.name = name;
-    }
-    const scoreData = this.globalScores.get(playerId);
-    if (scoreData) {
-      scoreData.name = name;
-    }
-  }
-
   getPlayerBySocketId(socketId) {
-    for (const player of this.players.values()) {
-      if (player.socketId === socketId) {
-        return player;
-      }
-    }
-    return null;
+    const playerId = this.socketIdToPlayer.get(socketId);
+    if (!playerId) return null;
+    return this.players.get(playerId) || null;
   }
 }

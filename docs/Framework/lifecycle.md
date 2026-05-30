@@ -24,6 +24,31 @@ constructor(id, name, description, minPlayers, maxPlayers)
 
 ---
 
+## Game Loop Management
+
+### startLoop(fps = 60)
+
+Starts a game loop that calls `onTick(deltaMs)` at the specified FPS. Automatically stopped when `endGame()` is called.
+
+```javascript
+async onStart({ players, globalScoreboard }) {
+  this.players = players;
+  this.scores = {};
+  players.forEach(p => this.scores[p.id] = 0);
+  this.startLoop(60);
+}
+```
+
+### stopLoop()
+
+Stops the game loop manually (called automatically by `endGame`).
+
+```javascript
+this.stopLoop(); // Usually not needed — endGame() handles this
+```
+
+---
+
 ## Lifecycle Hooks
 
 ### onStart({ players, globalScoreboard })
@@ -165,7 +190,7 @@ this.endGame({
 
 ### addPoints(playerId, points)
 
-Award points during gameplay (updates global scoreboard).
+Award points during gameplay. Updates the global scoreboard and emits `game:points` to all players and the global screen.
 
 ```javascript
 this.addPoints(playerId, 10);
@@ -202,57 +227,6 @@ this.disableOrientation();
 | `this.io` | Socket.IO | Reference to Socket.IO instance (set by framework) |
 | `this.gameId` | string | Current game session ID (set by framework) |
 | `this.requireOrientation` | boolean | Set to true if game needs motion controls |
-
----
-
-## Example: Minimal Pong Game
-
-```javascript
-import { GameBase } from '../../src/GameBase.js';
-
-export default class PongGame extends GameBase {
-  constructor() {
-    super('pong', 'Pong', 'Classic paddle game', 2, 2);
-    this.paddles = {};
-    this.ball = { x: 400, y: 300, vx: 3, vy: 3 };
-  }
-
-  async onStart({ players }) {
-    players.forEach((p, i) => {
-      this.paddles[p.id] = {
-        y: 250,
-        side: i === 0 ? 'left' : 'right'
-      };
-    });
-    this.scores = {};
-    players.forEach(p => this.scores[p.id] = 0);
-  }
-
-  onInput(playerId, data) {
-    if (data.type === 'joystick') {
-      this.paddles[playerId].y = data.y * 500;
-    }
-  }
-
-  onTick(deltaMs) {
-    this.ball.x += this.ball.vx;
-    this.ball.y += this.ball.vy;
-
-    // ... collision detection ...
-
-    this.sendToGlobalScreen('game:state', {
-      ball: this.ball,
-      paddles: this.paddles,
-      scores: this.scores
-    });
-  }
-
-  onPlayerLeave(playerId) {
-    this.endGame({ winners: [], scores: this.scores });
-    return false;
-  }
-}
-```
 
 ---
 

@@ -141,7 +141,7 @@ Protocol overview:
 4. Instead of JSON, it sends a binary WebSocket message:
    ```
    Byte 0: 0x01  (message type = orientation)
-   Bytes 1-4: playerId  (Uint32, big‑endian)
+   Bytes 1-4: playerId  (Uint32, little‑endian)
    Bytes 5-8: alpha (Float32)
    Bytes 9-12: beta (Float32)
    Bytes 13-16: gamma (Float32)

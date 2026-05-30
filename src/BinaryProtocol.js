@@ -1,14 +1,29 @@
 export class BinaryProtocol {
+  static PACKET_SIZE = 17;
+
   static MESSAGE_TYPE = {
     ORIENTATION: 0x01,
   };
 
   static encodeOrientation(playerId, alpha, beta, gamma) {
-    const buffer = new ArrayBuffer(17);
+    if (typeof playerId !== 'string' || !playerId) {
+      return null;
+    }
+    if (typeof alpha !== 'number' || typeof beta !== 'number' || typeof gamma !== 'number') {
+      return null;
+    }
+    if (!Number.isFinite(alpha) || !Number.isFinite(beta) || !Number.isFinite(gamma)) {
+      return null;
+    }
+
+    const parts = playerId.split('_');
+    const numId = parts.length > 1 ? parseInt(parts[1], 10) : 0;
+
+    const buffer = new ArrayBuffer(this.PACKET_SIZE);
     const view = new DataView(buffer);
 
     view.setUint8(0, this.MESSAGE_TYPE.ORIENTATION);
-    view.setUint32(1, parseInt(playerId.split('_')[1]) || 0, true);
+    view.setUint32(1, numId || 0, true);
     view.setFloat32(5, alpha, true);
     view.setFloat32(9, beta, true);
     view.setFloat32(13, gamma, true);
@@ -17,7 +32,7 @@ export class BinaryProtocol {
   }
 
   static decodeOrientation(buffer) {
-    if (!buffer || buffer.byteLength < 17) {
+    if (!buffer || buffer.byteLength < this.PACKET_SIZE) {
       return null;
     }
 
@@ -32,6 +47,10 @@ export class BinaryProtocol {
     const alpha = view.getFloat32(5, true);
     const beta = view.getFloat32(9, true);
     const gamma = view.getFloat32(13, true);
+
+    if (!Number.isFinite(alpha) || !Number.isFinite(beta) || !Number.isFinite(gamma)) {
+      return null;
+    }
 
     return {
       playerId: `player_${playerIdNum}`,

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>CouchParty — Join</title>
+  <link rel="stylesheet" href="/shared/styles.css">
+  <style>
+    body { justify-content: center; }
+    .join-form { max-width: 360px; }
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 24px;
+      font-size: 0.9rem;
+      color: #888;
+    }
+    .error-toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #e94560;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    .error-toast.show { opacity: 1; }
+    .joined-state { display: none; }
+    .joined-state.visible { display: block; }
+    .join-state { display: block; }
+    .join-state.hidden { display: none; }
+  </style>
+</head>
+<body class="disconnected">
+  <div class="container join-form">
+    <div class="status-bar">
+      <span class="status-dot offline" id="status-dot"></span>
+      <span id="status-text">Disconnected</span>
+      <span class="status-dot online" id="game-status-dot" style="display:none; margin-left: 8px;"></span>
+    </div>
+
+    <div id="join-state" class="join-state">
+      <h1>CouchParty</h1>
+      <p style="color: #aaa; margin-bottom: 24px;">Enter your name to join</p>
+
+      <div class="card">
+        <input class="input" id="name-input" type="text" placeholder="Your name" maxlength="20"
+               autocomplete="off" style="margin-bottom: 12px;">
+        <button class="btn" id="btn-join" onclick="joinGame()" style="width: 100%;" disabled>
+          Join
+        </button>
+      </div>
+
+      <p style="color: #666; font-size: 0.8rem; margin-top: 12px;">
+        Your name is visible to others on the same network
+      </p>
+    </div>
+
+    <div id="joined-state" class="joined-state">
+      <h1>CouchParty</h1>
+      <div class="card">
+        <p style="color: #4caf50; font-size: 1.2rem; margin-bottom: 8px;">✓ Joined!</p>
+        <p id="joined-name" style="color: #ccc; margin-bottom: 16px;"></p>
+        <button class="btn" onclick="leaveGame()" style="width: 100%; background: #555;">
+          Leave Game
+        </button>
+      </div>
+      <p style="color: #666; font-size: 0.8rem; margin-top: 12px;">
+        Waiting for the host to start a game...
+      </p>
+    </div>
+  </div>
+
+  <div id="error-toast" class="error-toast"></div>
+
+  <script src="/shared/socket.io.min.js"></script>
+  <script src="/shared/socket.js"></script>
+  <script>
+    const socket = getSocket();
+    const nameInput = document.getElementById('name-input');
+    const btnJoin = document.getElementById('btn-join');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const joinState = document.getElementById('join-state');
+    const joinedState = document.getElementById('joined-state');
+    const joinedName = document.getElementById('joined-name');
+
+    localStorage.setItem('cp_role', 'controller');
+
+    function showError(message) {
+      const toast = document.getElementById('error-toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 4000);
+    }
+
+    socket.on('connect', () => {
+      statusDot.className = 'status-dot online';
+      statusText.textContent = 'Connected';
+      updateJoinButton();
+    });
+
+    socket.on('disconnect', () => {
+      statusDot.className = 'status-dot offline';
+      statusText.textContent = 'Disconnected';
+      btnJoin.disabled = true;
+    });
+
+    socket.on('connect_error', () => {
+      statusDot.className = 'status-dot offline';
+      statusText.textContent = 'Connection failed';
+      btnJoin.disabled = true;
+    });
+
+    socket.on('error', ({ message }) => {
+      showError(message);
+      btnJoin.disabled = false;
+      btnJoin.textContent = 'Join';
+    });
+
+    nameInput.addEventListener('input', updateJoinButton);
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') joinGame();
+    });
+
+    function updateJoinButton() {
+      const name = nameInput.value.trim();
+      btnJoin.disabled = !name || !socket.connected;
+      btnJoin.textContent = name ? 'Join' : 'Enter a name';
+    }
+
+    function joinGame() {
+      const name = nameInput.value.trim();
+      if (!name || !socket.connected) return;
+      btnJoin.disabled = true;
+      btnJoin.textContent = 'Joining...';
+      socket.emit('player:join', { name });
+    }
+
+    function leaveGame() {
+      socket.emit('player:leave');
+      localStorage.removeItem('cp_token');
+      localStorage.removeItem('cp_playerId');
+      localStorage.removeItem('cp_playerName');
+      nameInput.value = '';
+      nameInput.disabled = false;
+      joinState.classList.remove('hidden');
+      joinedState.classList.remove('visible');
+      updateJoinButton();
+    }
+
+    socket.on('player:joined', ({ player, token }) => {
+      showJoinedState(player);
+    });
+
+    socket.on('player:reconnected', ({ player }) => {
+      showJoinedState(player);
+    });
+
+    function showJoinedState(player) {
+      btnJoin.textContent = 'Joined!';
+      nameInput.disabled = true;
+      joinedName.textContent = 'Playing as ' + player.name;
+      joinState.classList.add('hidden');
+      joinedState.classList.add('visible');
+    }
+
+    const savedName = localStorage.getItem('cp_playerName');
+    if (savedName) {
+      nameInput.value = savedName;
+      updateJoinButton();
+    }
+  </script>
+</body>
+</html>
