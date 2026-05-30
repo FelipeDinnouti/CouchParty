@@ -31,8 +31,9 @@ class Particle {
     const seconds = dt / 1000;
     this.age += dt;
     this.vy += this.gravity * seconds;
-    this.vx *= (1 - this.drag * seconds);
-    this.vy *= (1 - this.drag * seconds);
+    const dragFactor = Math.max(0, 1 - this.drag * seconds);
+    this.vx *= dragFactor;
+    this.vy *= dragFactor;
     this.x += this.vx * seconds;
     this.y += this.vy * seconds;
     this.size += this.grow * seconds;

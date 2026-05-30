@@ -5,6 +5,7 @@ export class ScreenShake {
     this._elapsed = 0;
     this._offsetX = 0;
     this._offsetY = 0;
+    this._applied = false;
   }
 
   shake(intensity, duration) {
@@ -36,11 +37,13 @@ export class ScreenShake {
     if (!this.isActive) return;
     ctx.save();
     ctx.translate(this._offsetX, this._offsetY);
+    this._applied = true;
   }
 
   reset(ctx) {
-    if (!this.isActive) return;
+    if (!this._applied) return;
     ctx.restore();
+    this._applied = false;
   }
 
   get isActive() {
