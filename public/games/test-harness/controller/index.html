@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Test Harness — Controller</title>
+  <link rel="stylesheet" href="/shared/styles.css">
+  <style>
+    html, body { overflow: hidden; height: 100%; }
+    body { background: #1a1a2e; touch-action: none; user-select: none; -webkit-user-select: none; }
+
+    .status-bar {
+      position: fixed; top: 0; left: 0; right: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; background: rgba(0,0,0,0.6); z-index: 50;
+      font-size: 0.8rem; color: #aaa;
+    }
+    .status-bar .status-left { display: flex; align-items: center; gap: 6px; }
+    .status-bar .game-label { color: #e94560; font-weight: bold; }
+
+    .orientation-display {
+      position: fixed; top: 40px; left: 0; right: 0;
+      padding: 6px 12px; background: rgba(15,20,40,0.85); z-index: 45;
+      display: none; font-size: 0.8rem; text-align: center;
+      font-family: monospace; color: #4fc3f7;
+    }
+    .orientation-display.active { display: block; }
+
+    .joystick-zone {
+      position: fixed; top: 80px; left: 0; right: 0; bottom: 100px;
+      z-index: 1;
+    }
+    .joystick-zone .readout {
+      position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+      font-family: monospace; font-size: 0.8rem; color: #888;
+      background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px;
+      z-index: 10; pointer-events: none;
+    }
+
+    .btn-group {
+      position: fixed; bottom: 16px; left: 0; right: 0;
+      display: flex; justify-content: space-between; padding: 0 24px;
+      z-index: 20; pointer-events: none;
+    }
+    .btn-group .game-btn {
+      width: 70px; height: 70px; border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.3);
+      font-size: 1.3rem; font-weight: bold; color: white;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: auto; cursor: pointer; user-select: none;
+      -webkit-user-select: none; touch-action: none;
+      transition: transform 0.1s, opacity 0.1s;
+    }
+    .btn-group .game-btn:active { transform: scale(0.9); opacity: 0.7; }
+    .btn-group .btn-a { background: rgba(233,69,96,0.6); border-color: #e94560; }
+    .btn-group .btn-b { background: rgba(79,195,247,0.6); border-color: #4fc3f7; }
+
+    .tap-hint {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: rgba(255,255,255,0.08);
+      font-size: 3rem; pointer-events: none; z-index: 0;
+    }
+
+    .toast-container {
+      position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
+      z-index: 100; display: flex; flex-direction: column;
+      gap: 6px; align-items: center; pointer-events: none;
+      width: 90%; max-width: 360px;
+    }
+    .toast {
+      padding: 10px 16px; border-radius: 8px;
+      font-size: 0.85rem; text-align: center;
+      opacity: 0; transform: translateY(-10px);
+      transition: opacity 0.3s, transform 0.3s;
+      pointer-events: auto; width: 100%;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.private { background: #0f3460; border: 1px solid #4fc3f7; color: #b3e5fc; }
+    .toast.broadcast { background: #1b5e20; border: 1px solid #4caf50; color: #a5d6a7; }
+    .toast .toast-label {
+      font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px;
+      opacity: 0.7; margin-bottom: 4px;
+    }
+    .toast .toast-msg { word-break: break-word; }
+  </style>
+</head>
+<body>
+  <div class="status-bar">
+    <div class="status-left">
+      <span class="status-dot offline" id="status-dot"></span>
+      <span id="status-text">Connecting...</span>
+    </div>
+    <span class="game-label">Test Harness</span>
+  </div>
+
+  <div class="orientation-display" id="orientation-display">
+    α: <span id="orient-alpha">0.0</span>°
+    β: <span id="orient-beta">0.0</span>°
+    γ: <span id="orient-gamma">0.0</span>°
+  </div>
+
+  <div class="joystick-zone" id="joystick-zone">
+    <div class="tap-hint">↕ tap anywhere</div>
+    <div class="readout" id="joystick-readout">x: 0.00  y: 0.00</div>
+  </div>
+
+  <div class="btn-group">
+    <div class="game-btn btn-a" id="btn-a">A</div>
+    <div class="game-btn btn-b" id="btn-b">B</div>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="./nipplejs.min.js"></script>
+  <script src="/shared/socket.io.min.js"></script>
+  <script type="module">
+    import { ControllerClient } from '/shared/lib/ControllerClient.js';
+    localStorage.setItem('cp_role', 'controller');
+
+    const token = localStorage.getItem('cp_token');
+    const socket = io({ query: token ? { token } : {} });
+
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const joystickReadout = document.getElementById('joystick-readout');
+    const orientDisplay = document.getElementById('orientation-display');
+    const orientAlpha = document.getElementById('orient-alpha');
+    const orientBeta = document.getElementById('orient-beta');
+    const orientGamma = document.getElementById('orient-gamma');
+
+    const cc = new ControllerClient();
+    cc.setSocket(socket);
+
+    socket.on('connect', () => {
+      statusDot.className = 'status-dot online';
+      statusText.textContent = 'Connected';
+    });
+
+    socket.on('disconnect', () => {
+      statusDot.className = 'status-dot offline';
+      statusText.textContent = 'Disconnected';
+    });
+
+    socket.on('connect_error', () => {
+      statusDot.className = 'status-dot offline';
+      statusText.textContent = 'Connection failed';
+    });
+
+    socket.on('player:reconnected', ({ player }) => {
+      statusText.textContent = 'Reconnected';
+      localStorage.setItem('cp_playerId', player.id);
+      localStorage.setItem('cp_playerName', player.name);
+      localStorage.setItem('cp_playerColor', player.color);
+    });
+
+    cc.onOrientationUpdate = (alpha, beta, gamma) => {
+      orientAlpha.textContent = alpha.toFixed(1);
+      orientBeta.textContent = beta.toFixed(1);
+      orientGamma.textContent = gamma.toFixed(1);
+    };
+
+    const joystick = cc.createJoystick('joystick-zone', {
+      size: 130,
+      color: '#e94560',
+      nippleOptions: { mode: 'static', position: { left: '50%', top: '45%' } },
+    });
+
+    if (joystick) {
+      joystick.on('move', (evt, data) => {
+        const x = data.vector ? data.vector.x : 0;
+        const y = data.vector ? data.vector.y : 0;
+        joystickReadout.textContent = `x: ${x.toFixed(2)}  y: ${y.toFixed(2)}`;
+      });
+      joystick.on('end', () => {
+        joystickReadout.textContent = 'x: 0.00  y: 0.00';
+      });
+    }
+
+    cc.createButton('A', 'btn-a');
+    cc.createButton('B', 'btn-b');
+
+    const joystickZone = document.getElementById('joystick-zone');
+    joystickZone.addEventListener('touchstart', (e) => {
+      const touch = e.changedTouches[0];
+      if (touch) {
+        cc.sendInput({ type: 'tap', x: touch.clientX, y: touch.clientY });
+      }
+    }, { passive: true });
+    joystickZone.addEventListener('click', (e) => {
+      if (e.target === joystickZone || e.target.classList.contains('tap-hint')) {
+        cc.sendInput({ type: 'tap', x: e.clientX, y: e.clientY });
+      }
+    });
+
+    socket.on('enableOrientation', () => {
+      orientDisplay.classList.add('active');
+    });
+
+    socket.on('disableOrientation', () => {
+      orientDisplay.classList.remove('active');
+      orientAlpha.textContent = '0.0';
+      orientBeta.textContent = '0.0';
+      orientGamma.textContent = '0.0';
+    });
+
+    function showToast(type, msg) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      const label = type === 'private' ? 'Private Message' : 'Broadcast Message';
+      toast.innerHTML = `<div class="toast-label">${label}</div><div class="toast-msg">${msg}</div>`;
+      container.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.add('show'));
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    socket.on('test:feedback', ({ msg }) => showToast('private', msg));
+    socket.on('test:broadcast', ({ msg }) => showToast('broadcast', msg));
+
+    socket.on('game:end', () => {
+      setTimeout(() => {
+        window.location.href = '/lobby/controller.html';
+      }, 500);
+    });
+  </script>
+</body>
+</html>

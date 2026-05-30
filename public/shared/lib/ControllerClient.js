@@ -129,6 +129,9 @@ export class ControllerClient {
       const gamma = event.gamma || 0;
       this.input.tilt = { alpha, beta, gamma };
       this._sendOrientation(alpha, beta, gamma);
+      if (this.onOrientationUpdate) {
+        this.onOrientationUpdate(alpha, beta, gamma);
+      }
     };
 
     window.addEventListener('deviceorientation', this._orientationHandler);

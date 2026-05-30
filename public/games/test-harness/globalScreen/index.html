@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Test Harness — Dashboard</title>
+  <link rel="stylesheet" href="/shared/styles.css">
+  <style>
+    body { background: #1a1a2e; overflow-x: hidden; }
+    .container { max-width: 1200px; width: 100%; padding: 12px; margin: 0 auto; }
+
+    .dashboard-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+    }
+    .dashboard-header h1 { font-size: 1.4rem; color: #e94560; margin: 0; }
+    .dashboard-header .subtitle { color: #888; font-size: 0.8rem; }
+    .dashboard-header .btn-end {
+      background: #c62828; color: white; border: none;
+      padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+    }
+    .dashboard-header .btn-end:hover { background: #e53935; }
+
+    .section-title { font-size: 1rem; color: #ccc; margin: 16px 0 8px; display: flex; align-items: center; gap: 8px; }
+    .section-title .count { font-size: 0.75rem; color: #888; font-weight: normal; }
+
+    .player-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 8px; margin-bottom: 8px;
+    }
+    .player-card {
+      background: #16213e; border-radius: 8px; padding: 12px;
+      border-left: 4px solid #555;
+    }
+    .player-card .p-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .player-card .p-name { font-size: 0.95rem; font-weight: bold; }
+    .player-card .p-status { font-size: 0.65rem; color: #888; }
+    .player-card .p-row { font-size: 0.78rem; color: #aaa; font-family: monospace; display: flex; justify-content: space-between; }
+    .player-card .p-row span { min-width: 60px; }
+    .player-card .p-row .label { color: #666; }
+    .player-card .p-counters { display: flex; gap: 10px; font-size: 0.78rem; font-family: monospace; color: #4fc3f7; margin-top: 4px; }
+
+    .btn-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 6px; margin-bottom: 8px;
+    }
+    .btn-grid .test-btn {
+      background: #0f3460; color: #ccc; border: 1px solid #1a4a8a;
+      padding: 10px 8px; border-radius: 6px; cursor: pointer;
+      font-size: 0.8rem; text-align: center; transition: background 0.15s;
+    }
+    .btn-grid .test-btn:hover { background: #1a4a8a; color: #fff; }
+    .btn-grid .test-btn.active { background: #e94560; border-color: #e94560; color: #fff; }
+    .btn-grid .test-btn.danger { border-color: #c62828; color: #ef9a9a; }
+    .btn-grid .test-btn.danger:hover { background: #c62828; color: #fff; }
+    .btn-grid .test-btn.success { border-color: #4caf50; color: #a5d6a7; }
+    .btn-grid .test-btn.success:hover { background: #2e7d32; color: #fff; }
+
+    .canvas-section { display: none; margin-bottom: 8px; }
+    .canvas-section.active { display: block; }
+    .canvas-wrapper {
+      background: #0d1117; border-radius: 8px; overflow: hidden;
+      position: relative; width: 100%; height: 360px;
+    }
+    .canvas-wrapper canvas {
+      display: block; margin: 0 auto;
+    }
+    .canvas-label {
+      position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+      font-size: 0.8rem; color: rgba(255,255,255,0.3); pointer-events: none;
+      font-family: monospace;
+    }
+
+    .event-log {
+      background: #0d1117; border-radius: 8px; padding: 8px 12px;
+      max-height: 200px; overflow-y: auto; font-family: monospace;
+      font-size: 0.72rem; line-height: 1.6;
+    }
+    .event-log .entry { color: #888; }
+    .event-log .entry .ts { color: #555; }
+    .event-log .entry .msg { color: #b0bec5; }
+
+    .gs-message-toast {
+      position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+      background: #0f3460; border: 1px solid #4fc3f7; color: #b3e5fc;
+      padding: 12px 24px; border-radius: 8px; font-size: 0.9rem;
+      z-index: 200; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+    }
+    .gs-message-toast.show { opacity: 1; }
+
+    .orient-indicator {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      margin-right: 4px;
+    }
+    .orient-indicator.on { background: #4caf50; }
+    .orient-indicator.off { background: #555; }
+
+    @media (max-width: 600px) {
+      .btn-grid { grid-template-columns: repeat(2, 1fr); }
+      .player-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="dashboard-header">
+      <div>
+        <h1>Framework Test Harness</h1>
+        <div class="subtitle">Developer Dashboard</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="status-dot offline" id="status-dot"></span>
+        <span id="status-text" style="font-size:0.8rem;color:#888;">Connecting...</span>
+        <button class="btn-end" id="btn-end-game">End Game</button>
+      </div>
+    </div>
+
+    <div class="section-title">
+      <span>Player Monitor</span>
+      <span class="count" id="player-count">(0)</span>
+    </div>
+    <div class="player-grid" id="player-grid"></div>
+
+    <div class="section-title">Communication Tests</div>
+    <div class="btn-grid" id="comm-btns"></div>
+
+    <div class="section-title">Engine Feature Tests</div>
+    <div class="btn-grid" id="engine-btns"></div>
+
+    <div class="canvas-section" id="canvas-section">
+      <div class="canvas-wrapper" id="canvas-wrapper">
+        <canvas id="engine-canvas"></canvas>
+        <div class="canvas-label" id="canvas-label">—</div>
+      </div>
+    </div>
+
+    <div class="section-title">Event Log</div>
+    <div class="event-log" id="event-log">
+      <div class="entry"><span class="ts">[--:--:--]</span> <span class="msg">Waiting for game start...</span></div>
+    </div>
+  </div>
+
+  <div class="gs-message-toast" id="gs-toast"></div>
+
+  <script src="/shared/socket.io.min.js"></script>
+  <script type="module">
+    import { GameClient } from '/shared/lib/GameClient.js';
+    import { aabbOverlap, circleOverlap, circleRectOverlap, distance, clamp } from '/shared/lib/Physics.js';
+    import { ParticleSystem } from '/shared/lib/ParticleSystem.js';
+    import { ScreenShake } from '/shared/lib/ScreenShake.js';
+    import { CharacterController } from '/shared/lib/CharacterController.js';
+    import { AssetLoader } from '/shared/lib/AssetLoader.js';
+    import * as Overlays from '/shared/lib/UIOverlay.js';
+
+    const socket = io();
+    const logEl = document.getElementById('event-log');
+    const playerGrid = document.getElementById('player-grid');
+    const playerCount = document.getElementById('player-count');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const canvasSection = document.getElementById('canvas-section');
+    const canvasLabel = document.getElementById('canvas-label');
+    const gsToast = document.getElementById('gs-toast');
+
+    const client = new GameClient('engine-canvas', {
+      virtualWidth: 800,
+      virtualHeight: 600,
+      backgroundColor: '#0d1117',
+    });
+
+    const VIRTUAL_W = 800;
+    const VIRTUAL_H = 600;
+
+    const playerStates = {};
+    let playerNames = {};
+    let activeEngineTest = null;
+    let orientEnabled = false;
+    let __particleSystem = new ParticleSystem();
+    let __screenShake = new ScreenShake();
+    let __character = null;
+    let __overlays = [];
+    let __engineDemoTime = 0;
+    let __assetLoaded = false;
+    let __assetLoader = null;
+    let __progressOverlay = null;
+
+    socket.on('connect', () => {
+      statusDot.className = 'status-dot online';
+      statusText.textContent = 'Connected';
+      log('Socket connected');
+    });
+
+    socket.on('disconnect', () => {
+      statusDot.className = 'status-dot offline';
+      statusText.textContent = 'Disconnected';
+    });
+
+    socket.on('connect_error', () => {
+      statusDot.className = 'status-dot offline';
+      statusText.textContent = 'Connection failed';
+    });
+
+    socket.on('game:start', ({ players }) => {
+      if (players) {
+        for (const p of players) {
+          playerNames[p.id] = p.name;
+          playerStates[p.id] = {
+            name: p.name, color: p.color,
+            joystick: { x: 0, y: 0 },
+            orientation: { alpha: 0, beta: 0, gamma: 0 },
+            counters: { taps: 0, joystickMoves: 0, buttons: { A: 0, B: 0 } },
+          };
+        }
+        log(`Game started with ${players.length} player(s)`);
+        renderPlayerMonitor();
+      }
+    });
+
+    socket.on('test:joystick', ({ playerId, x, y }) => {
+      if (playerStates[playerId]) {
+        playerStates[playerId].joystick = { x, y };
+        updatePlayerCard(playerId);
+      }
+    });
+
+    socket.on('test:orientation', ({ playerId, alpha, beta, gamma }) => {
+      if (playerStates[playerId]) {
+        playerStates[playerId].orientation = { alpha, beta, gamma };
+        updatePlayerCard(playerId);
+      }
+    });
+
+    socket.on('test:inputCounts', (counts) => {
+      for (const [pid, data] of Object.entries(counts)) {
+        if (playerStates[pid]) {
+          playerStates[pid].counters = {
+            taps: data.taps || 0,
+            joystickMoves: data.joystickMoves || 0,
+            buttons: { A: (data.buttons && data.buttons.A) || 0, B: (data.buttons && data.buttons.B) || 0 },
+          };
+        }
+      }
+      for (const pid of Object.keys(playerStates)) {
+        updatePlayerCard(pid);
+      }
+    });
+
+    socket.on('test:gsMessage', ({ msg }) => {
+      gsToast.textContent = msg;
+      gsToast.classList.add('show');
+      setTimeout(() => gsToast.classList.remove('show'), 3000);
+      log(`GS message: ${msg}`);
+    });
+
+    socket.on('test:log', ({ timestamp, msg }) => {
+      log(msg, timestamp);
+    });
+
+    socket.on('game:countdown', ({ remaining }) => {
+      log(`Countdown: ${remaining}`);
+    });
+
+    socket.on('game:timer', ({ remaining }) => {
+      if (remaining % 5 === 0 || remaining <= 3) {
+        log(`Timer: ${remaining}s`);
+      }
+    });
+
+    socket.on('game:end', () => {
+      client.stop();
+      log('Game ended, returning to lobby...');
+      setTimeout(() => {
+        window.location.href = '/lobby/globalScreen.html';
+      }, 3000);
+    });
+
+    socket.on('game:points', ({ playerId, points }) => {
+      log(`Points: +${points} for ${playerNames[playerId] || playerId}`);
+    });
+
+    socket.emit('lobby:requestState');
+
+    function log(msg, ts) {
+      const time = ts ? new Date(ts) : new Date();
+      const h = String(time.getHours()).padStart(2, '0');
+      const m = String(time.getMinutes()).padStart(2, '0');
+      const s = String(time.getSeconds()).padStart(2, '0');
+      const entry = document.createElement('div');
+      entry.className = 'entry';
+      entry.innerHTML = `<span class="ts">[${h}:${m}:${s}]</span> <span class="msg">${msg}</span>`;
+      logEl.appendChild(entry);
+      while (logEl.children.length > 50) logEl.removeChild(logEl.firstChild);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function renderPlayerMonitor() {
+      const ids = Object.keys(playerStates);
+      playerCount.textContent = `(${ids.length})`;
+      if (ids.length === 0) {
+        playerGrid.innerHTML = '<div style="color:#666;font-size:0.85rem;padding:8px;">Waiting for players...</div>';
+        return;
+      }
+      playerGrid.innerHTML = ids.map(id => {
+        const p = playerStates[id];
+        return `
+          <div class="player-card" style="border-left-color:${p.color}" data-pid="${id}">
+            <div class="p-header">
+              <span class="status-dot online"></span>
+              <span class="p-name" style="color:${p.color}">${p.name}</span>
+            </div>
+            <div class="p-row"><span class="label">Joystick</span><span id="joy-${id}">x: 0.00  y: 0.00</span></div>
+            <div class="p-row"><span class="label">Orientation</span><span id="orient-${id}">—</span></div>
+            <div class="p-counters" id="counters-${id}">
+              <span>T:0</span><span>J:0</span><span>A:0</span><span>B:0</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updatePlayerCard(playerId) {
+      const p = playerStates[playerId];
+      if (!p) return;
+      const joyEl = document.getElementById(`joy-${playerId}`);
+      if (joyEl) {
+        joyEl.textContent = `x: ${p.joystick.x.toFixed(2)}  y: ${p.joystick.y.toFixed(2)}`;
+      }
+      const orientEl = document.getElementById(`orient-${playerId}`);
+      if (orientEl) {
+        orientEl.textContent = orientEnabled
+          ? `α:${p.orientation.alpha.toFixed(1)} β:${p.orientation.beta.toFixed(1)} γ:${p.orientation.gamma.toFixed(1)}`
+          : '—';
+      }
+      const countersEl = document.getElementById(`counters-${playerId}`);
+      if (countersEl) {
+        const c = p.counters;
+        countersEl.innerHTML = `<span>T:${c.taps}</span><span>J:${c.joystickMoves}</span><span>A:${c.buttons.A}</span><span>B:${c.buttons.B}</span>`;
+      }
+    }
+
+    function sendTestAction(action, extra = {}) {
+      socket.emit('game:input', { type: 'test', action, ...extra });
+    }
+
+    const commActions = [
+      { label: '→ P1', action: 'sendToPlayer', targetFirst: true },
+      { label: '→ P2 (if exists)', action: 'sendToPlayer', targetSecond: true },
+      { label: '→ GS Only', action: 'sendToGS' },
+      { label: 'Broadcast All', action: 'broadcast' },
+      { label: 'Orient ON', action: 'enableOrientation', cls: 'success' },
+      { label: 'Orient OFF', action: 'disableOrientation', cls: 'danger' },
+      { label: 'Countdown 3s', action: 'countdown' },
+      { label: 'Timer 30s', action: 'timer' },
+      { label: 'Add Pts P1', action: 'addPoints', targetFirst: true },
+    ];
+
+    const commContainer = document.getElementById('comm-btns');
+    commContainer.innerHTML = commActions.map(a => `
+      <button class="test-btn ${a.cls || ''}" data-action="${a.action}" data-target-first="${a.targetFirst || ''}" data-target-second="${a.targetSecond || ''}">
+        ${a.label}
+      </button>
+    `).join('');
+
+    commContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('.test-btn');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const ids = Object.keys(playerStates);
+      if (btn.dataset.targetFirst && ids.length > 0) {
+        sendTestAction(action, { targetId: ids[0], msg: `Hello ${playerStates[ids[0]].name}!` });
+      } else if (btn.dataset.targetSecond && ids.length > 1) {
+        sendTestAction(action, { targetId: ids[1], msg: `Hello ${playerStates[ids[1]].name}!` });
+      } else if (action === 'enableOrientation') {
+        orientEnabled = true;
+        sendTestAction(action);
+        for (const pid of Object.keys(playerStates)) updatePlayerCard(pid);
+      } else if (action === 'disableOrientation') {
+        orientEnabled = false;
+        sendTestAction(action);
+        for (const pid of Object.keys(playerStates)) updatePlayerCard(pid);
+      } else {
+        sendTestAction(action);
+      }
+      log(`Comm: ${action}`);
+    });
+
+    document.getElementById('btn-end-game').addEventListener('click', () => {
+      sendTestAction('endGame');
+      log('Sent endGame command');
+    });
+
+    const engineActions = [
+      { label: 'Physics', id: 'physics' },
+      { label: 'Particles', id: 'particles' },
+      { label: 'Screen Shake', id: 'screenshake' },
+      { label: 'Audio', id: 'audio' },
+      { label: 'Character', id: 'character' },
+      { label: 'Asset Loader', id: 'assetloader' },
+      { label: 'UIOverlay', id: 'uioverlay' },
+      { label: 'Clear', id: 'clear', cls: 'danger' },
+    ];
+
+    const engineContainer = document.getElementById('engine-btns');
+    engineContainer.innerHTML = engineActions.map(a => `
+      <button class="test-btn ${a.cls || ''}" data-engine="${a.id}">${a.label}</button>
+    `).join('');
+
+    engineContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('.test-btn');
+      if (!btn) return;
+      const id = btn.dataset.engine;
+      if (!id) return;
+      engineContainer.querySelectorAll('.test-btn[data-engine]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      runEngineTest(id);
+    });
+
+    function stopCanvas() {
+      client.stop();
+      canvasSection.classList.remove('active');
+      activeEngineTest = null;
+      __particleSystem = new ParticleSystem();
+      __screenShake = new ScreenShake();
+      __character = null;
+      __overlays = [];
+      __assetLoaded = false;
+      __assetLoader = null;
+      __progressOverlay = null;
+      client.render = () => {};
+      client.onTick = () => {};
+    }
+
+    function runEngineTest(id) {
+      client.stop();
+
+      if (id === 'clear') {
+        stopCanvas();
+        engineContainer.querySelectorAll('.test-btn[data-engine]').forEach(b => b.classList.remove('active'));
+        return;
+      }
+
+      activeEngineTest = id;
+      canvasSection.classList.add('active');
+      canvasLabel.textContent = id;
+      __engineDemoTime = 0;
+
+      if (id === 'audio') {
+        playAudioTest();
+        engineContainer.querySelectorAll('.test-btn[data-engine]').forEach(b => b.classList.remove('active'));
+        return;
+      }
+
+      if (id === 'particles') {
+        __particleSystem = new ParticleSystem();
+        client.onTick = (dt) => {
+          __engineDemoTime += dt;
+          if (__engineDemoTime < 100) {
+            __particleSystem.confetti(VIRTUAL_W / 2, VIRTUAL_H / 2, { count: 60 });
+            __particleSystem.burst(VIRTUAL_W / 3, VIRTUAL_H / 3);
+            __particleSystem.fountain(VIRTUAL_W / 2, VIRTUAL_H);
+          }
+          if (Math.random() < 0.3) __particleSystem.trail(Math.random() * VIRTUAL_W, Math.random() * VIRTUAL_H);
+          __particleSystem.update(dt);
+        };
+        client.render = () => {
+          __particleSystem.render(client.ctx);
+          client.ctx.fillStyle = '#888';
+          client.ctx.font = '11px monospace';
+          client.ctx.textAlign = 'left';
+          client.ctx.fillText(`Particles: ${__particleSystem.getCount()}`, 10, 20);
+        };
+        client.start();
+        return;
+      }
+
+      if (id === 'physics') {
+        client.onTick = (dt) => {
+          __engineDemoTime += dt;
+          const sec = dt / 1000;
+          for (const r of physicsObjects.rects) {
+            r.x += r.vx * sec;
+            r.y += r.vy * sec;
+            if (r.x < 0 || r.x + r.width > VIRTUAL_W) r.vx *= -1;
+            if (r.y < 0 || r.y + r.height > VIRTUAL_H) r.vy *= -1;
+            r.x = clamp(r.x, 0, VIRTUAL_W - r.width);
+            r.y = clamp(r.y, 0, VIRTUAL_H - r.height);
+          }
+          for (const c of physicsObjects.circles) {
+            c.x += c.vx * sec;
+            c.y += c.vy * sec;
+            if (c.x - c.r < 0 || c.x + c.r > VIRTUAL_W) c.vx *= -1;
+            if (c.y - c.r < 0 || c.y + c.r > VIRTUAL_H) c.vy *= -1;
+            c.x = clamp(c.x, c.r, VIRTUAL_W - c.r);
+            c.y = clamp(c.y, c.r, VIRTUAL_H - c.r);
+          }
+        };
+        client.render = () => {
+          const objs = physicsObjects;
+          const rectA = objs.rects[0];
+          const rectB = objs.rects[1];
+          const circleA = objs.circles[0];
+          const circleB = objs.circles[1];
+
+          const rOverlap = aabbOverlap(rectA, rectB);
+          const cOverlap = circleOverlap(circleA, circleB);
+          const crOverlap = circleRectOverlap(circleA, rectA);
+
+          client.ctx.globalAlpha = 0.3;
+          for (const r of objs.rects) {
+            client.ctx.fillStyle = r.color;
+            client.ctx.fillRect(r.x, r.y, r.width, r.height);
+            client.ctx.strokeStyle = '#fff';
+            client.ctx.lineWidth = 1;
+            client.ctx.strokeRect(r.x, r.y, r.width, r.height);
+          }
+          for (const c of objs.circles) {
+            client.ctx.fillStyle = c.color;
+            client.ctx.beginPath();
+            client.ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+            client.ctx.fill();
+            client.ctx.strokeStyle = '#fff';
+            client.ctx.lineWidth = 1;
+            client.ctx.stroke();
+          }
+          client.ctx.globalAlpha = 1;
+
+          client.ctx.font = '12px monospace';
+          client.ctx.textAlign = 'left';
+          client.ctx.fillStyle = rOverlap ? '#4caf50' : '#666';
+          client.ctx.fillText(`AABB overlap: ${rOverlap}`, 10, 20);
+          client.ctx.fillStyle = cOverlap ? '#4caf50' : '#666';
+          client.ctx.fillText(`Circle overlap: ${cOverlap}`, 10, 36);
+          client.ctx.fillStyle = crOverlap ? '#4caf50' : '#666';
+          client.ctx.fillText(`Circle-Rect: ${crOverlap}`, 10, 52);
+
+          client.ctx.fillStyle = '#888';
+          client.ctx.font = '11px monospace';
+          client.ctx.textAlign = 'right';
+          client.ctx.fillText(`distance: ${distance(rectA.x, rectA.y, rectB.x, rectB.y).toFixed(0)}`, VIRTUAL_W - 10, 20);
+        };
+        client.start();
+        return;
+      }
+
+      if (id === 'screenshake') {
+        __screenShake = new ScreenShake();
+        client.onTick = (dt) => {
+          __engineDemoTime += dt;
+          if (__engineDemoTime < 200) {
+            __screenShake.shake(12, 800);
+          }
+          if (__engineDemoTime > 1000 && __engineDemoTime < 1200 && !__screenShake.isActive) {
+            __screenShake.shake(8, 600);
+          }
+          if (__engineDemoTime > 2000 && __engineDemoTime < 2200 && !__screenShake.isActive) {
+            __screenShake.shake(15, 1000);
+          }
+          __screenShake.update(dt);
+        };
+        client.render = () => {
+          __screenShake.apply(client.ctx);
+          client.ctx.fillStyle = '#1a1a2e';
+          client.ctx.fillRect(20, 20, VIRTUAL_W - 40, VIRTUAL_H - 40);
+          client.ctx.strokeStyle = '#e94560';
+          client.ctx.lineWidth = 2;
+          client.ctx.strokeRect(20, 20, VIRTUAL_W - 40, VIRTUAL_H - 40);
+          client.ctx.fillStyle = '#4fc3f7';
+          client.ctx.font = '24px monospace';
+          client.ctx.textAlign = 'center';
+          client.ctx.fillText('SHAKE!', VIRTUAL_W / 2, VIRTUAL_H / 2 - 10);
+          client.ctx.fillStyle = '#888';
+          client.ctx.font = '12px monospace';
+          client.ctx.fillText(`Intensity: ${__screenShake.isActive ? 'active' : 'idle'}`, VIRTUAL_W / 2, VIRTUAL_H / 2 + 20);
+          __screenShake.reset(client.ctx);
+        };
+        client.start();
+        return;
+      }
+
+      if (id === 'character') {
+        __character = new CharacterController({
+          mode: 'topdown', x: 400, y: 300, width: 32, height: 48,
+          maxSpeed: 150, color: '#e94560',
+        });
+        client.onTick = (dt) => {
+          __engineDemoTime += dt;
+          if (__engineDemoTime < 500) {
+            __character.mode = 'topdown';
+          }
+          const input = {
+            x: Math.sin(__engineDemoTime / 1500) * 0.8,
+            y: Math.cos(__engineDemoTime / 2000) * 0.6,
+            jump: false,
+          };
+          __character.update(dt, input);
+          if (__character.x < 0) __character.x = 0;
+          if (__character.x > VIRTUAL_W) __character.x = VIRTUAL_W;
+          if (__character.y < 0) __character.y = 0;
+          if (__character.y > VIRTUAL_H) __character.y = VIRTUAL_H;
+        };
+        client.render = () => {
+          client.ctx.save();
+          client.ctx.translate(__character.x, __character.y);
+          client.ctx.fillStyle = '#e94560';
+          client.ctx.fillRect(-__character.width / 2, -__character.height / 2, __character.width, __character.height);
+          client.ctx.fillStyle = '#fff';
+          const eyeX = __character.facing === 'right' ? 4 : -4;
+          client.ctx.fillRect(eyeX - 4, -10, 4, 4);
+          client.ctx.fillRect(eyeX + 4, -10, 4, 4);
+          client.ctx.restore();
+
+          const state = __character.getState();
+          client.ctx.fillStyle = '#888';
+          client.ctx.font = '11px monospace';
+          client.ctx.textAlign = 'left';
+          client.ctx.fillText(`State: ${state.state}  Facing: ${state.facing}`, 10, 20);
+          client.ctx.fillText(`Speed: ${Math.sqrt(state.vx * state.vx + state.vy * state.vy).toFixed(0)}`, 10, 36);
+          client.ctx.fillText(`Mode: ${__character.mode}`, 10, 52);
+        };
+        client.start();
+        return;
+      }
+
+      if (id === 'uioverlay') {
+        setupOverlays();
+        client.onTick = (dt) => {
+          __engineDemoTime += dt;
+          const idx = Math.floor(__engineDemoTime / 2000) % __overlays.length;
+          const current = __overlays[idx];
+          if (current.overlay instanceof Overlays.CountdownOverlay) {
+            current.overlay.update(3 - Math.floor(__engineDemoTime / 1000) % 4);
+          }
+          if (current.overlay instanceof Overlays.TimerOverlay) {
+            current.overlay.update(60 - Math.floor(__engineDemoTime / 1000) % 60);
+          }
+        };
+        client.render = () => {
+          const idx = Math.floor(__engineDemoTime / 2000) % __overlays.length;
+          const current = __overlays[idx];
+          client.ctx.fillStyle = '#555';
+          client.ctx.font = '12px monospace';
+          client.ctx.textAlign = 'center';
+          client.ctx.fillText('Cycling overlays...', VIRTUAL_W / 2, 30);
+          client.ctx.fillStyle = '#888';
+          client.ctx.font = '11px monospace';
+          client.ctx.fillText(`Active: ${current.label}`, VIRTUAL_W / 2, 50);
+          current.overlay.render(client.ctx, 1);
+          client.ctx.fillStyle = '#666';
+          client.ctx.font = '10px monospace';
+          client.ctx.textAlign = 'center';
+          client.ctx.fillText(`Next cycle in ${2 - (__engineDemoTime % 2000) / 1000 | 0}s`, VIRTUAL_W / 2, VIRTUAL_H - 10);
+        };
+        client.start();
+        return;
+      }
+
+      if (id === 'assetloader') {
+        runAssetLoaderTest();
+        return;
+      }
+
+      stopCanvas();
+      engineContainer.querySelectorAll('.test-btn[data-engine]').forEach(b => b.classList.remove('active'));
+    }
+
+    const physicsObjects = (() => {
+      const rects = [
+        { x: 100, y: 200, width: 80, height: 60, vx: 60, vy: 40, color: '#e94560' },
+        { x: 500, y: 200, width: 80, height: 60, vx: -60, vy: -30, color: '#4fc3f7' },
+      ];
+      const circles = [
+        { x: 300, y: 400, r: 30, vx: 50, vy: -40, color: '#4caf50' },
+        { x: 600, y: 400, r: 35, vx: -40, vy: 50, color: '#ff9800' },
+      ];
+      return { rects, circles };
+    })();
+
+    function playAudioTest() {
+      try {
+        const actx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = actx.createOscillator();
+        const gain = actx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 440;
+        gain.gain.value = 0.3;
+        osc.connect(gain);
+        gain.connect(actx.destination);
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.5);
+        osc.stop(actx.currentTime + 0.5);
+        log('Audio: played 440Hz beep');
+      } catch (e) {
+        log(`Audio error: ${e.message}`);
+      }
+    }
+
+    function runAssetLoaderTest() {
+      __assetLoader = new AssetLoader();
+      const dataUri = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      __progressOverlay = new Overlays.ProgressBarOverlay({
+        x: 200, y: 260, width: 400, height: 32, label: 'Loading test asset...', color: '#4fc3f7',
+      });
+      __assetLoaded = false;
+
+      __assetLoader.onProgress((loaded, total) => {
+        if (__progressOverlay) __progressOverlay.update(loaded / total);
+      });
+
+      client.onTick = (dt) => {
+        __engineDemoTime += dt;
+        if (!__assetLoaded && __engineDemoTime > 500) {
+          __assetLoader.loadImages({ test: dataUri }).then(() => {
+            __assetLoaded = true;
+            log('Asset Loader: image loaded (1x1 magenta placeholder)');
+          });
+        }
+        if (__assetLoaded && __engineDemoTime > 3000) {
+          stopCanvas();
+          engineContainer.querySelectorAll('.test-btn[data-engine]').forEach(b => b.classList.remove('active'));
+        }
+      };
+
+      client.render = () => {
+        if (__progressOverlay) __progressOverlay.render(client.ctx, client.scale);
+        if (__assetLoaded) {
+          client.ctx.fillStyle = '#4caf50';
+          client.ctx.font = '14px monospace';
+          client.ctx.textAlign = 'center';
+          client.ctx.fillText('✓ Asset loaded successfully', VIRTUAL_W / 2, 330);
+        }
+      };
+
+      client.start();
+    }
+
+    function setupOverlays() {
+      __overlays = [];
+      __engineDemoTime = 0;
+
+      const sb = new Overlays.ScoreboardOverlay({ x: 30, y: 80, width: 250 });
+      sb.update([
+        { playerId: 'p1', name: 'Alice', score: 42, color: '#e94560' },
+        { playerId: 'p2', name: 'Bob', score: 28, color: '#4fc3f7' },
+        { playerId: 'p3', name: 'Charlie', score: 15, color: '#4caf50' },
+      ]);
+      __overlays.push({ overlay: sb, label: 'Scoreboard' });
+
+      const timer = new Overlays.TimerOverlay({ x: 400, y: 80 });
+      timer.update(45);
+      __overlays.push({ overlay: timer, label: 'Timer' });
+
+      const hb = new Overlays.HealthBarOverlay({ x: 30, y: 140, width: 180, height: 14 });
+      hb.update([
+        { current: 75, max: 100, color: '#4caf50', label: 'Player 1' },
+        { current: 45, max: 100, color: '#ff9800', label: 'Player 2' },
+      ]);
+      __overlays.push({ overlay: hb, label: 'Health Bars' });
+
+      const cd = new Overlays.CountdownOverlay({ width: VIRTUAL_W, height: VIRTUAL_H });
+      cd.start(3);
+      __overlays.push({ overlay: cd, label: 'Countdown' });
+
+      const go = new Overlays.GameOverOverlay({ width: VIRTUAL_W, height: VIRTUAL_H });
+      go.show({
+        winners: [{ name: 'Alice' }],
+        scores: [
+          { name: 'Alice', score: 42 },
+          { name: 'Bob', score: 28 },
+        ],
+      });
+      __overlays.push({ overlay: go, label: 'Game Over' });
+    }
+
+    log('Dashboard ready');
+  </script>
+</body>
+</html>

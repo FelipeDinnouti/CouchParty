@@ -31,7 +31,7 @@
 
 ## Phase 4: Shared Client Scripts (`public/shared/`)
 - ✅ `socket.js` — Connection management, token persistence, role-based navigation, connect_error handler, game:end custom event + delayed redirect
-- ❌ `orientation.js` — Motion permissions + binary streaming
+- ✅ `orientation.js` — Motion permissions + binary streaming + value callback
 - ✅ `styles.css` — Common styles (player cards, buttons, QR, status indicators)
 
 ## Phase 5: Lobby Pages (`public/lobby/`)
@@ -60,9 +60,15 @@
 A dev-tool game that validates every framework feature — not a real game, but a living test suite.
 
 ### Core patterns tested
-- ❌ **Server** (`game.js`) — Lifecycle hooks (onStart, onTick, onInput, onPlayerLeave, onOrientation, endGame), game loop (startLoop/stopLoop), communication (sendToPlayer, sendToGlobalScreen, broadcastToAll), scores (addPoints, endGame with winners/scores), orientation (enable/disable), idempotent endGame, multiple player counts
-- ❌ **Global screen** (`globalScreen/index.html`) — Live state rendering, test selection and execution, pass/fail result display, heartbeat/FPS indicator, manual trigger for each test
-- ❌ **Controller** (`controller/index.html`) — Input type buttons (tap, joystick, button), orientation display, private feedback display (test:feedback), broadcast display (test:broadcast)
+- ✅ **Server** (`game.js`) — Lifecycle hooks (onStart, onTick, onInput, onPlayerLeave, onOrientation, endGame), game loop (startLoop/stopLoop), communication (sendToPlayer, sendToGlobalScreen, broadcastToAll), scores (addPoints, endGame with winners/scores), orientation (enable/disable), idempotent endGame, multiple player counts
+- ✅ **Global screen** (`globalScreen/index.html`) — Live player monitor, communication test buttons, engine feature tests with canvas output via `GameClient`, live event log
+- ✅ **Controller** (`controller/index.html`) — Joystick (nipplejs), tap zone, A/B buttons, orientation display, message inbox (private + broadcast), `cp_role` localStorage, reconnection token persistence
+
+### Design refactors (May 2026)
+- ✅ **Dashboard → GameClient** — Replaced manual DPI/resize/rAF in engine tests with `GameClient` instance; uses `client.onTick`/`client.render` pattern, `client.resize()` for window resize
+- ✅ **Physics object naming** — All collision rect properties renamed from `w`/`h` to `width`/`height` to match Physics.js API; collision callbacks pass objects directly instead of wrapping
+- ✅ **Controller reconnection** — `cp_role` stored in localStorage; `player:reconnected` event saves `cp_playerId`, `cp_playerName`, `cp_playerColor` for persistent identity
+- ✅ **GameClient.resize()** — Added public method to `GameClient` that delegates to existing `_setupCanvas()` for external resize triggers
 
 ### Tests the harness runs
 
@@ -111,11 +117,17 @@ A dev-tool game that validates every framework feature — not a real game, but 
 - ✅ Per-player `game:input` throttle (30ms cooldown)
 - ✅ Removed dead `updatePlayerName` method from PlayerManager
 
+### Client-Side Navigation Bugfix (May 2026)
+
+- ✅ **Cross-tab localStorage interference** — `cp_role` was set *after* `socket.js` loaded and read from `localStorage` at event time, allowing one tab's role write to overwrite another's before `game:start` fired. Fixes applied to `socket.js` and both lobby pages:
+  - `lobby/controller.html` and `lobby/globalScreen.html`: `cp_role` is now set in a dedicated `<script>` block **before** `socket.js` loads, so the module-level `playerRole` capture is correct.
+  - `shared/socket.js`: `game:start` and `game:end` handlers use the module-level `playerRole` variable (captured once per page load) instead of reading `localStorage.getItem('cp_role')` at event time. This isolates each tab's navigation decision from writes by other tabs sharing the same origin's localStorage.
+  - **Affects**: All games, since the fix is in shared lobby pages and `socket.js`.
+
 ---
 
 ## Immediate Next Steps
 
-1. **Build Framework Test Harness** — `public/games/test-harness/` with game.js, globalScreen, controller pages
-2. **Build orientation.js** — Client-side motion permissions + binary streaming (or integrate into `ControllerClient.js`)
-3. **Run integration tests** — Verify nothing broke: `node test/lobby.js`
-4. **Manual test** — Start server, open screens, verify lobby + game flow
+1. **Build actual games** — Start implementing game plugins (racing, wood-cutting, cook-off, friend-bombs)
+2. **Run integration tests** — Verify nothing broke: `node test/lobby.js`
+3. **Manual test** — Start server, open screens, verify lobby + game flow

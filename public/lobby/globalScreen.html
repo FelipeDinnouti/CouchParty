@@ -92,6 +92,7 @@
     <p style="color: #888; margin-top: 20px; font-size: 0.85rem;">Returning to lobby...</p>
   </div>
 
+  <script>localStorage.setItem('cp_role', 'globalScreen');</script>
   <script src="/shared/socket.io.min.js"></script>
   <script src="/shared/socket.js"></script>
   <script>
@@ -100,8 +101,6 @@
     let gamesData = [];
     let playerCount = 0;
     const socket = getSocket();
-
-    localStorage.setItem('cp_role', 'globalScreen');
 
     function showError(message) {
       const toast = document.getElementById('error-toast');

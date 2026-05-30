@@ -53,11 +53,18 @@ io.on('connection', (socket) => {
     if (player) {
       socket.emit('player:reconnected', { player });
       if (player.inGame && currentGame && player.gameId === currentGameId) {
+        const gamePlayers = playerManager.getGamePlayers(currentGameId);
         socket.emit('game:start', {
           gameId: currentGame.id,
           globalScreenUrl: `/games/${currentGame.id}/globalScreen/`,
           controllerUrl: `/games/${currentGame.id}/controller/`,
+          players: gamePlayers.map(p => ({
+            id: p.id,
+            name: p.name,
+            color: p.color,
+          })),
         });
+        socket.join(`game_${currentGameId}`);
       }
       return;
     }
@@ -197,7 +204,12 @@ io.on('connection', (socket) => {
 
   socket.on('game:input', (data) => {
     const player = playerManager.getPlayerBySocketId(socket.id);
-    if (!player || !currentGame || !player.inGame || player.gameId !== currentGameId) return;
+    if (!player || !currentGame || !player.inGame || player.gameId !== currentGameId) {
+      if (currentGame && data && typeof data === 'object' && data.type === 'test') {
+        currentGame.onInput('gs', data);
+      }
+      return;
+    }
 
     if (!data || typeof data !== 'object' || Array.isArray(data)) return;
 

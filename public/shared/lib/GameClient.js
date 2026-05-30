@@ -106,6 +106,10 @@ export class GameClient {
     this._overlays = [];
   }
 
+  resize() {
+    this._setupCanvas();
+  }
+
   onTick(dt) {}
   onState(state) { this.state = state; }
   onGameEnd(results) {}

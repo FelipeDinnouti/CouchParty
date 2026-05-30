@@ -81,6 +81,7 @@
 
   <div id="error-toast" class="error-toast"></div>
 
+  <script>localStorage.setItem('cp_role', 'controller');</script>
   <script src="/shared/socket.io.min.js"></script>
   <script src="/shared/socket.js"></script>
   <script>
@@ -92,8 +93,6 @@
     const joinState = document.getElementById('join-state');
     const joinedState = document.getElementById('joined-state');
     const joinedName = document.getElementById('joined-name');
-
-    localStorage.setItem('cp_role', 'controller');
 
     function showError(message) {
       const toast = document.getElementById('error-toast');

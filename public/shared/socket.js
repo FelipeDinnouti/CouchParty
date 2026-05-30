@@ -57,8 +57,7 @@ function getSocket() {
       localStorage.setItem('cp_gamePlayers', JSON.stringify(payload.players));
     }
     window.dispatchEvent(new CustomEvent('game:start', { detail: payload }));
-    const role = localStorage.getItem('cp_role');
-    if (role === 'controller') {
+    if (playerRole === 'controller') {
       window.location.href = payload.controllerUrl;
     } else {
       window.location.href = payload.globalScreenUrl;
@@ -68,10 +67,9 @@ function getSocket() {
   _socket.on('game:end', (results) => {
     window.dispatchEvent(new CustomEvent('game:end', { detail: results }));
 
-    const role = localStorage.getItem('cp_role');
     const delay = results && results.scores ? 3000 : 500;
     setTimeout(() => {
-      if (role === 'controller') {
+      if (playerRole === 'controller') {
         window.location.href = '/lobby/controller.html';
       } else {
         window.location.href = '/lobby/globalScreen.html';
